@@ -3,6 +3,8 @@ import hashlib
 import os
 from tac.protoblock.protoblock import ProtoBlock
 from tac.protoblock.factory import ProtoBlockFactory
+from tac.cli.main import load_config
+from tac.core.executor import ProtoBlockExecutor
 
 class DynamicProcessor:
     def __init__(self, base_dir=None):
@@ -13,7 +15,7 @@ class DynamicProcessor:
         # Assemble full paths
         self.fp_func = os.path.join(self.base_dir, "dynamic_module.py")
         self.fp_test = os.path.join(self.base_dir, "tests/test_dynamic_module.py")
-        self.fp_proto = os.path.join(self.base_dir, "bubu.json")
+        self.fp_proto = os.path.join(self.base_dir, "module.json")
         
         self.factory = ProtoBlockFactory()
 
@@ -38,6 +40,10 @@ class DynamicProcessor:
             return hashlib.sha256(f.read()).hexdigest()
         
     def generate_protoblock(self, task_description):
+        # Delete existing protoblock file if it exists
+        if os.path.exists(self.fp_proto):
+            os.remove(self.fp_proto)
+            
         task_description = task_description
         test_specification = "" 
         test_data_generation = ""
@@ -46,8 +52,9 @@ class DynamicProcessor:
         commit_message = "None"
         test_results = None
         
-        pb = ProtoBlock(task_description, test_specification, test_data_generation, write_files, context_files, commit_message, test_results)
-        self.factory.save_protoblock(pb, self.fp_proto)
+        protoblock = ProtoBlock(task_description, test_specification, test_data_generation, write_files, context_files, commit_message, test_results)
+        self.factory.save_protoblock(protoblock, self.fp_proto)
+        return protoblock
 
         
         
@@ -56,26 +63,62 @@ if __name__ == "__main__":
     import time
 
     processor = DynamicProcessor()
-    task_description = "implement a function that combines the three images together. it has to pass the existing test. make sure the function has to be called 'process'."
-    processor.generate_protoblock(task_description)
+    task_user = "let us make an interesting function that takes the camera images and adds it to itself flipped left to right, and ensure that the range of values is the same as in the input images."
+    task_static = "the input of the function are three numpy arrays that are images: img_camera, img_mask_segmentation, img_diffusion, which are all float32. we need one numpy array as output. it has to pass the existing test. make sure the function name is called 'process'."
+    task_description = task_user + "\n" + task_static
+    protoblock = processor.generate_protoblock(task_description)
+
+    config = load_config("/home/lugo/git/tac/config.yaml")
     
-    xxx
+    # Override config flags as in the CLI: disable git and plausibility check
+    config['git'] = {'enabled': False}  # Disable git operations
+    if 'general' in config:
+        config['general']['plausibility_check'] = False  # Disable plausibility check
 
-    img_camera = np.random.rand(64,64,3).astype(np.float32)
-    img_mask_segmentation = np.random.rand(64,64,3).astype(np.float32)
-    img_diffusion = np.random.rand(64,64,3).astype(np.float32)
+    
+    # Create a ProtoBlockExecutor with the loaded protoblock, config, and codebase context
+    executor = ProtoBlockExecutor(protoblock=protoblock, config=config, codebase="")
+    
+    # Execute the block (this will run tests, make changes, etc.)
+    result = executor.execute_block()
 
-    with open(os.path.expanduser('~/tmp/dynamic_module.py'), 'w') as f: 
-        f.write("def compute_effect(a,b,c):\n  print('Code state A')\n  return c\n")
+    # # Execute tac make command
+    # import subprocess
+    # import sys
 
-    img_camera = processor.compute_effect(img_camera, img_mask_segmentation, img_diffusion)
+    # # Construct the conda run command to ensure we're in rtd environment
+    # cmd = "source ~/.bashrc; conda init; conda activate rtd; tac make --json module.json --no-git --plausibility-check false"
+    
+    # try:
+    #     result = subprocess.run(cmd, shell=True, check=True, executable="/bin/bash", capture_output=True, text=True)
+    #     print("Command output:")
+    #     print(result.stdout)
+    #     if result.stderr:
+    #         print("Errors/Warnings:")
+    #         print(result.stderr)
+    # except subprocess.CalledProcessError as e:
+    #     print(f"Error executing command: {e}")
+    #     print("Error output:")
+    #     print(e.stderr)
+    #     sys.exit(1)
+
+    # xxx
+
+    # img_camera = np.random.rand(64,64,3).astype(np.float32)
+    # img_mask_segmentation = np.random.rand(64,64,3).astype(np.float32)
+    # img_diffusion = np.random.rand(64,64,3).astype(np.float32)
+
+    # with open(os.path.expanduser('~/tmp/dynamic_module.py'), 'w') as f: 
+    #     f.write("def compute_effect(a,b,c):\n  print('Code state A')\n  return c\n")
+
+    # img_camera = processor.compute_effect(img_camera, img_mask_segmentation, img_diffusion)
 
 
-    time.sleep(1)
+    # time.sleep(1)
 
-    with open(os.path.expanduser('~/tmp/dynamic_module.py'), 'w') as f: 
-        f.write("def compute_effect(a,b,c):\n  print('Code state B')\n  return c\n")
+    # with open(os.path.expanduser('~/tmp/dynamic_module.py'), 'w') as f: 
+    #     f.write("def compute_effect(a,b,c):\n  print('Code state B')\n  return c\n")
 
-    img_camera = processor.compute_effect(img_camera, img_mask_segmentation, img_diffusion)
+    # img_camera = processor.compute_effect(img_camera, img_mask_segmentation, img_diffusion)
 
     
