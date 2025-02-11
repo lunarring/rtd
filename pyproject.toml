@@ -13,7 +13,8 @@ license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = [
-  "huggingface_hub<1.0",
+  "huggingface_hub==0.25.0",
+  "tokenizers>=0.20,<0.21",
   "diffusers",
   "torch",
   "Pillow",
