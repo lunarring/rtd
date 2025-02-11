@@ -4,40 +4,53 @@ import lunar_tools as lt
 import numpy as np
 from rtd.utils.input_image import InputImageProcessor, AcidProcessor
 from rtd.utils.fps_tracker import FPSTracker
+from rtd.utils.prompt_provider import PromptProviderMicrophone
 import sys
 
 if __name__ == "__main__":
-    # Example for overriding kwargs
     height_diffusion = 384
     width_diffusion = 512
-    shape_hw = (576,1024)
+    height_render = 1080
+    width_render = 1920
+    shape_hw_cam = (576,1024)
 
 
     akai_lpd8 = lt.MidiInput(device_name="akai_lpd8")
 
     de_img = DiffusionEngine(use_image2image=True, height_diffusion_desired=height_diffusion, width_diffusion_desired=width_diffusion)
     em = EmbeddingsMixer(de_img.pipe)
-    embeds = em.encode_prompt("photo of a new house")
+    embeds = em.encode_prompt("photo of a cat")
     de_img.set_embeddings(embeds)
 
-    renderer = lt.Renderer(width=width_diffusion, height=height_diffusion, backend='opencv', do_fullscreen=False)
-    cam = lt.WebCam(shape_hw=shape_hw)
+    renderer = lt.Renderer(width=width_render, height=height_render, backend='opencv', do_fullscreen=False)
+    cam = lt.WebCam(shape_hw=shape_hw_cam)
     input_image_processor = InputImageProcessor()
     input_image_processor.set_flip(do_flip=True, flip_axis=1)
 
     acid_processor = AcidProcessor(height_diffusion=height_diffusion, width_diffusion=width_diffusion)
 
+    prompt_provider = PromptProviderMicrophone(init_prompt="Image of a cat")
+
     # Initialize FPS tracking
     fps_tracker = FPSTracker()
 
     while True:
-        do_human_seg = akai_lpd8.get("A0", button_mode='toggle', val_default=True) # toggle switches the state with every press between on and off
-        do_blur = akai_lpd8.get("B0", button_mode='toggle', val_default=True) # toggle switches the state with every press between on and off
+        do_human_seg = akai_lpd8.get("A0", button_mode='toggle', val_default=True) 
+        do_blur = akai_lpd8.get("B0", button_mode='toggle', val_default=True) 
+        mic_button_state = akai_lpd8.get("A1", button_mode='held_down') 
         do_debug_seethrough = akai_lpd8.get("D1", button_mode='toggle', val_default=False)
-        acid_strength = akai_lpd8.get("E0", val_min=0, val_max=1.0) 
+        acid_strength = akai_lpd8.get("E0", val_min=0, val_max=1.0, val_default=0.1)
         coef_noise = akai_lpd8.get("E1", val_min=0, val_max=1.0, val_default=0.15) 
-        img_cam = cam.get_img()
 
+        prompt_provider.handle_mic_button(mic_button_state)
+
+        if prompt_provider.new_prompt_available():
+            current_prompt = prompt_provider.get_current_prompt()
+            print(f"New prompt: {current_prompt}")
+            embeds = em.encode_prompt(current_prompt)
+            de_img.set_embeddings(embeds)
+            
+        img_cam = cam.get_img()
         # Start timing image processing
         fps_tracker.start_segment("Image Proc")
         input_image_processor.set_human_seg(do_human_seg)
