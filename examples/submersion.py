@@ -2,7 +2,7 @@ from rtd.sdxl_turbo.diffusion_engine import DiffusionEngine
 from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
 import lunar_tools as lt
 import numpy as np
-from rtd.utils.input_image import InputImageProcessor
+from rtd.utils.input_image import InputImageProcessor, AcidProcessor
 from rtd.utils.fps_tracker import FPSTracker
 import sys
 
@@ -22,22 +22,28 @@ if __name__ == "__main__":
     input_image_processor = InputImageProcessor()
     input_image_processor.set_flip(do_flip=True, flip_axis=1)
 
+    acid_processor = AcidProcessor(height_diffusion=height_diffusion, width_diffusion=width_diffusion)
+
     # Initialize FPS tracking
     fps_tracker = FPSTracker()
 
     while True:
-        cam_img = cam.get_img()
+        img_cam = cam.get_img()
 
         # Start timing image processing
         fps_tracker.start_segment("Image Proc")
-        cam_img, human_segmmask = input_image_processor.process(cam_img)
+        img_cam, human_segmmask = input_image_processor.process(img_cam)
+        img_acid = acid_processor.process(img_cam)
 
         # Start timing diffusion
-        fps_tracker.start_segment("Diffusion")
-        de_img.set_input_image(cam_img)
-        img = de_img.generate()
+        fps_tracker.start_segment("Acid Proc")
+        de_img.set_input_image(img_acid)
 
-        renderer.render(img)
+        fps_tracker.start_segment("Diffusion")
+        img_diffusion  = de_img.generate()
+
+        acid_processor.update(img_diffusion)
+        renderer.render(img_diffusion)
 
         # Update and display FPS (this will also handle the last segment timing)
         if fps_tracker.update():

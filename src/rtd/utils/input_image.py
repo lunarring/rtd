@@ -7,6 +7,7 @@ from .wobblers import WobbleMan
 from .segmentation_detection import HumanSeg
 from lunar_tools import exception_handler
 import lunar_tools as lt
+from PIL import Image
 
 def img2tensor(tensor):
     """
@@ -370,6 +371,9 @@ class AcidProcessor():
         return img_input
     
     def update(self, img_diffusion):
+        # Convert PIL Image to numpy array if needed
+        if isinstance(img_diffusion, Image.Image):
+            img_diffusion = np.array(img_diffusion)
         self.last_diffusion_image_torch = torch.from_numpy(img_diffusion).to(self.device, dtype=torch.float)
 
     
