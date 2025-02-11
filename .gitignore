@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 .cursorrules
+logs/*
 .tac_*
 .aider*
 __pycache__/

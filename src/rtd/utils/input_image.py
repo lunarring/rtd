@@ -276,7 +276,7 @@ class AcidProcessor():
     def set_rotation_angle(self, rotation_angle):
         self.rotation_angle = rotation_angle
 
-    def set_do_acid_tracers(self, do_acid_tracers):
+    def set_acid_tracers(self, do_acid_tracers):
         self.do_acid_tracers = do_acid_tracers
 
     def set_apply_humansegm_mask(self, apply_humansegm_mask):

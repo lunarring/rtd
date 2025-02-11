@@ -13,11 +13,10 @@ if __name__ == "__main__":
     height_render = 1080
     width_render = 1920
     shape_hw_cam = (576,1024)
-
+    do_compile = False
 
     akai_lpd8 = lt.MidiInput(device_name="akai_lpd8")
-
-    de_img = DiffusionEngine(use_image2image=True, height_diffusion_desired=height_diffusion, width_diffusion_desired=width_diffusion)
+    de_img = DiffusionEngine(use_image2image=True, height_diffusion_desired=height_diffusion, width_diffusion_desired=width_diffusion, do_compile=do_compile)
     em = EmbeddingsMixer(de_img.pipe)
     embeds = em.encode_prompt("photo of a cat")
     de_img.set_embeddings(embeds)
@@ -36,11 +35,14 @@ if __name__ == "__main__":
 
     while True:
         do_human_seg = akai_lpd8.get("A0", button_mode='toggle', val_default=True) 
-        do_blur = akai_lpd8.get("B0", button_mode='toggle', val_default=True) 
         mic_button_state = akai_lpd8.get("A1", button_mode='held_down') 
+        do_blur = akai_lpd8.get("B0", button_mode='toggle', val_default=True) 
+        do_acid_tracers = akai_lpd8.get("B1", button_mode='toggle', val_default=True) 
         do_debug_seethrough = akai_lpd8.get("D1", button_mode='toggle', val_default=False)
         acid_strength = akai_lpd8.get("E0", val_min=0, val_max=1.0, val_default=0.1)
-        coef_noise = akai_lpd8.get("E1", val_min=0, val_max=1.0, val_default=0.15) 
+        acid_strength_foreground = akai_lpd8.get("E1", val_min=0, val_max=1.0, val_default=0.1)
+        coef_noise = akai_lpd8.get("F0", val_min=0, val_max=1.0, val_default=0.15) 
+        zoom_factor = akai_lpd8.get("F1", val_min=0.5, val_max=1.5, val_default=1.0) 
 
         prompt_provider.handle_mic_button(mic_button_state)
 
@@ -60,6 +62,9 @@ if __name__ == "__main__":
         # Acid
         acid_processor.set_acid_strength(acid_strength)
         acid_processor.set_coef_noise(coef_noise)
+        acid_processor.set_acid_tracers(do_acid_tracers)
+        acid_processor.set_acid_strength_foreground(acid_strength_foreground)
+        acid_processor.set_zoom_factor(zoom_factor)
         img_acid = acid_processor.process(img_proc)
 
         # Start timing diffusion
