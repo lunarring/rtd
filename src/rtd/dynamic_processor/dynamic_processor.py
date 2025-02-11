@@ -18,6 +18,7 @@ class DynamicProcessor:
         self.fp_proto = os.path.join(self.base_dir, "module.json")
         
         self.factory = ProtoBlockFactory()
+        self.protoblock = None
 
 
     def compute_effect(self, img_camera, img_mask_segmentation, img_diffusion):
@@ -54,7 +55,22 @@ class DynamicProcessor:
         
         protoblock = ProtoBlock(task_description, test_specification, test_data_generation, write_files, context_files, commit_message, test_results)
         self.factory.save_protoblock(protoblock, self.fp_proto)
+        self.protoblock = protoblock
         return protoblock
+    
+    def execute_protoblock(self):
+        config = load_config("/home/lugo/git/tac/config.yaml")
+        
+        # Override config flags as in the CLI: disable git and plausibility check
+        config['git'] = {'enabled': False}  # Disable git operations
+        if 'general' in config:
+            config['general']['plausibility_check'] = False  # Disable plausibility check
+        
+        # Create a ProtoBlockExecutor with the loaded protoblock, config, and codebase context
+        executor = ProtoBlockExecutor(protoblock=protoblock, config=config, codebase="")
+        
+        # Execute the block (this will run tests, make changes, etc.)
+        result = executor.execute_block()
 
         
         
@@ -63,24 +79,18 @@ if __name__ == "__main__":
     import time
 
     processor = DynamicProcessor()
+    
     task_user = "let us make an interesting function that takes the camera images and adds it to itself flipped left to right, and ensure that the range of values is the same as in the input images."
     task_static = "the input of the function are three numpy arrays that are images: img_camera, img_mask_segmentation, img_diffusion, which are all float32. we need one numpy array as output. it has to pass the existing test. make sure the function name is called 'process'."
     task_description = task_user + "\n" + task_static
+
     protoblock = processor.generate_protoblock(task_description)
 
-    config = load_config("/home/lugo/git/tac/config.yaml")
-    
-    # Override config flags as in the CLI: disable git and plausibility check
-    config['git'] = {'enabled': False}  # Disable git operations
-    if 'general' in config:
-        config['general']['plausibility_check'] = False  # Disable plausibility check
+    processor.execute_protoblock()
 
-    
-    # Create a ProtoBlockExecutor with the loaded protoblock, config, and codebase context
-    executor = ProtoBlockExecutor(protoblock=protoblock, config=config, codebase="")
-    
-    # Execute the block (this will run tests, make changes, etc.)
-    result = executor.execute_block()
+
+
+
 
     # # Execute tac make command
     # import subprocess
