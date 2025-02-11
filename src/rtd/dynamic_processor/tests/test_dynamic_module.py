@@ -1,15 +1,20 @@
 import unittest
 import numpy as np
 import time
+import os
+import sys
+
+# Add parent directory to Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from dynamic_module import process
 
 class TestDynamicModule(unittest.TestCase):
     def setUp(self):
-        # Create sample test data with known shapes
-        self.shape = (256, 256, 3)  # Example shape for RGB image
-        self.img_camera = np.ones(self.shape)
-        self.img_mask = np.zeros(self.shape)
-        self.img_diffusion = np.full(self.shape, 0.5)
+        # Create sample test data with known shapes and float32 data type
+        self.shape = (1024, 1024, 3)  # Example shape for RGB image
+        self.img_camera = np.ones(self.shape, dtype=np.float32)
+        self.img_mask = np.zeros(self.shape, dtype=np.float32)
+        self.img_diffusion = np.full(self.shape, 0.5, dtype=np.float32)
 
     def test_output_shape(self):
         """Test that output shape matches input shape"""
@@ -17,15 +22,20 @@ class TestDynamicModule(unittest.TestCase):
         self.assertEqual(result.shape, self.img_camera.shape)
 
     def test_data_type(self):
-        """Test that output data type matches input data type"""
+        """Test that output data type is float32"""
         result = process(self.img_camera, self.img_mask, self.img_diffusion)
-        self.assertEqual(result.dtype, self.img_camera.dtype)
+        self.assertEqual(result.dtype, np.float32)
 
     def test_first_input_recovery(self):
-        """Test that we can recover first input by subtracting others"""
+        """Test that we can recover the averaged camera image by subtracting other inputs"""
         result = process(self.img_camera, self.img_mask, self.img_diffusion)
         recovered = result - self.img_mask - self.img_diffusion
-        np.testing.assert_array_equal(recovered, self.img_camera)
+        expected = (self.img_camera.astype(np.float64) + np.fliplr(self.img_camera).astype(np.float64)) / 2.0
+        if np.issubdtype(self.img_camera.dtype, np.integer):
+            expected = np.rint(expected).astype(self.img_camera.dtype)
+        else:
+            expected = expected.astype(self.img_camera.dtype)
+        np.testing.assert_array_equal(recovered, expected)
 
     def test_performance(self):
         """Test that processing time is under 100ms"""
