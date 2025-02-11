@@ -12,6 +12,9 @@ if __name__ == "__main__":
     width_diffusion = 512
     shape_hw = (576,1024)
 
+
+    akai_lpd8 = lt.MidiInput(device_name="akai_lpd8")
+
     de_img = DiffusionEngine(use_image2image=True, height_diffusion_desired=height_diffusion, width_diffusion_desired=width_diffusion)
     em = EmbeddingsMixer(de_img.pipe)
     embeds = em.encode_prompt("photo of a new house")
@@ -28,12 +31,23 @@ if __name__ == "__main__":
     fps_tracker = FPSTracker()
 
     while True:
+        do_human_seg = akai_lpd8.get("A0", button_mode='toggle', val_default=True) # toggle switches the state with every press between on and off
+        do_blur = akai_lpd8.get("B0", button_mode='toggle', val_default=True) # toggle switches the state with every press between on and off
+        do_debug_seethrough = akai_lpd8.get("D1", button_mode='toggle', val_default=False)
+        acid_strength = akai_lpd8.get("E0", val_min=0, val_max=1.0) 
+        coef_noise = akai_lpd8.get("E1", val_min=0, val_max=1.0, val_default=0.15) 
         img_cam = cam.get_img()
 
         # Start timing image processing
         fps_tracker.start_segment("Image Proc")
-        img_cam, human_segmmask = input_image_processor.process(img_cam)
-        img_acid = acid_processor.process(img_cam)
+        input_image_processor.set_human_seg(do_human_seg)
+        input_image_processor.set_blur(do_blur)
+        img_proc, human_segmmask = input_image_processor.process(img_cam)
+        
+        # Acid
+        acid_processor.set_acid_strength(acid_strength)
+        acid_processor.set_coef_noise(coef_noise)
+        img_acid = acid_processor.process(img_proc)
 
         # Start timing diffusion
         fps_tracker.start_segment("Acid Proc")
@@ -43,7 +57,11 @@ if __name__ == "__main__":
         img_diffusion  = de_img.generate()
 
         acid_processor.update(img_diffusion)
-        renderer.render(img_diffusion)
+
+        if do_debug_seethrough:
+            renderer.render(img_proc)
+        else:
+            renderer.render(img_diffusion)  
 
         # Update and display FPS (this will also handle the last segment timing)
         if fps_tracker.update():

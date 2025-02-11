@@ -107,7 +107,7 @@ def torch_rotate(x, a):
 
 
 class InputImageProcessor():
-    def __init__(self, do_human_seg=True, do_blur=True, blur_kernel=3, is_infrared=False):
+    def __init__(self, do_human_seg=True, do_blur=False, blur_kernel=3, is_infrared=False):
         self.brightness = 1.0
         self.saturization = 1.0
         self.hue_rotation_angle = 0
