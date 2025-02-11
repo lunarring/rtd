@@ -8,11 +8,11 @@ class DynamicProcessor:
     def __init__(self, base_dir=None):
         self.module_hash = None
         # Use default base_dir if none provided
-        self.base_dir = base_dir or os.path.expanduser("~/git/tmp")
+        self.base_dir = "."
         
         # Assemble full paths
         self.fp_func = os.path.join(self.base_dir, "dynamic_module.py")
-        self.fp_test = os.path.join(self.base_dir, "test_dynamic_module.py")
+        self.fp_test = os.path.join(self.base_dir, "tests/test_dynamic_module.py")
         self.fp_proto = os.path.join(self.base_dir, "bubu.json")
         
         self.factory = ProtoBlockFactory()
@@ -37,10 +37,10 @@ class DynamicProcessor:
         with open(file_path, 'rb') as f:
             return hashlib.sha256(f.read()).hexdigest()
         
-    def generate_protoblock(self):
-        task_description = "implement a function that computes the effect of a camera on a diffusion model"
-        test_specification = "no further tests need to be written" 
-        test_data_generation =  "no test data is required"
+    def generate_protoblock(self, task_description):
+        task_description = task_description
+        test_specification = "" 
+        test_data_generation = ""
         write_files = [self.fp_func]
         context_files = [self.fp_test]
         commit_message = "None"
@@ -56,7 +56,10 @@ if __name__ == "__main__":
     import time
 
     processor = DynamicProcessor()
-    processor.generate_protoblock()
+    task_description = "implement a function that combines the three images together. it has to pass the existing test. make sure the function has to be called 'process'."
+    processor.generate_protoblock(task_description)
+    
+    xxx
 
     img_camera = np.random.rand(64,64,3).astype(np.float32)
     img_mask_segmentation = np.random.rand(64,64,3).astype(np.float32)
