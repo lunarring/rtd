@@ -14,6 +14,24 @@ renderer = lt.Renderer(width=width_diffusion, height=height_diffusion, backend='
 cam = lt.WebCam()
 # midi_input = lt.MidiInput(device_name="akai_midimix")
 
+import sys
+if len(sys.argv) > 1 and sys.argv[1] == "processor":
+    import numpy as np
+    from rtd.utils.input_image import InputImageProcessor
+    # Instantiate the processor and force a valid blur setting to avoid runtime errors
+    processor = InputImageProcessor()
+    processor.set_blur_size(3)
+    # Create a dummy image of shape 256x256x3
+    dummy_img = np.random.randint(0,256,(256,256,3), dtype=np.uint8)
+    processed_img, seg_mask = processor.process(dummy_img)
+    print("Integration Demo:")
+    print("Processed image shape:", processed_img.shape)
+    if seg_mask is not None:
+         print("Segmentation mask shape:", seg_mask.shape)
+    else:
+         print("No segmentation mask returned.")
+    sys.exit(0)
+
 # acid_process = InputImageProcessor()
 
 while True:
