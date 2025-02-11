@@ -1,4 +1,7 @@
 # Byte-compiled / optimized / DLL files
+dynamic_module.py
+*.pyc
+*.py~
 .cursorrules
 logs/*
 .tac_*
