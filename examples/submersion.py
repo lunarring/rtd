@@ -3,6 +3,7 @@ from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
 import lunar_tools as lt
 import numpy as np
 from rtd.utils.input_image import InputImageProcessor
+from rtd.utils.fps_tracker import FPSTracker
 import sys
 
 if __name__ == "__main__":
@@ -19,15 +20,28 @@ if __name__ == "__main__":
     renderer = lt.Renderer(width=width_diffusion, height=height_diffusion, backend='opencv', do_fullscreen=False)
     cam = lt.WebCam(shape_hw=shape_hw)
     input_image_processor = InputImageProcessor()
+    input_image_processor.set_flip(do_flip=True, flip_axis=1)
 
+    # Initialize FPS tracking
+    fps_tracker = FPSTracker()
 
     while True:
         cam_img = cam.get_img()
+
+        # Start timing image processing
+        fps_tracker.start_segment("Image Proc")
         cam_img, human_segmmask = input_image_processor.process(cam_img)
+
+        # Start timing diffusion
+        fps_tracker.start_segment("Diffusion")
         de_img.set_input_image(cam_img)
         img = de_img.generate()
+
         renderer.render(img)
 
+        # Update and display FPS (this will also handle the last segment timing)
+        if fps_tracker.update():
+            fps_tracker.print_fps()
 
         # if brightness is not None:
         #     self.iip.set_brightness(brightness)
