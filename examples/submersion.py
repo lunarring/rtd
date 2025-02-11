@@ -3,7 +3,6 @@ from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
 import lunar_tools as lt
 import numpy as np
 from rtd.utils.input_image import InputImageProcessor, AcidProcessor
-from rtd.utils.fps_tracker import FPSTracker
 from rtd.utils.prompt_provider import PromptProviderMicrophone
 import sys
 
@@ -31,7 +30,7 @@ if __name__ == "__main__":
     prompt_provider = PromptProviderMicrophone(init_prompt="Image of a cat")
 
     # Initialize FPS tracking
-    fps_tracker = FPSTracker()
+    fps_tracker = lt.FPSTracker()
 
     while True:
         do_human_seg = akai_lpd8.get("A0", button_mode='toggle', val_default=True) 
