@@ -81,8 +81,7 @@ if __name__ == "__main__":
             renderer.render(img_diffusion)  
 
         # Update and display FPS (this will also handle the last segment timing)
-        if fps_tracker.update():
-            fps_tracker.print_fps()
+        fps_tracker.print_fps()
 
         # if brightness is not None:
         #     self.iip.set_brightness(brightness)
