@@ -66,7 +66,7 @@ if __name__ == "__main__":
     img_camera = processor.compute_effect(img_camera, img_mask_segmentation, img_diffusion)
 
 
-    time.sleep(1)lls
+    time.sleep(1)
 
     with open(os.path.expanduser('~/tmp/dynamic_module.py'), 'w') as f: 
         f.write("def compute_effect(a,b,c):\n  print('Code state B')\n  return c\n")
