@@ -5,11 +5,16 @@ from tac.protoblock.protoblock import ProtoBlock
 from tac.protoblock.factory import ProtoBlockFactory
 
 class DynamicProcessor:
-    def __init__(self):
+    def __init__(self, base_dir=None):
         self.module_hash = None
-        self.fp_func = "/home/lugo/git/tmp/dynamic_module.py"
-        self.fp_test = "/home/lugo/git/tmp/test_dynamic_module.py"
-        self.fp_proto = "/home/lugo/git/tmp/bubu.json"
+        # Use default base_dir if none provided
+        self.base_dir = base_dir or os.path.expanduser("~/git/tmp")
+        
+        # Assemble full paths
+        self.fp_func = os.path.join(self.base_dir, "dynamic_module.py")
+        self.fp_test = os.path.join(self.base_dir, "test_dynamic_module.py")
+        self.fp_proto = os.path.join(self.base_dir, "bubu.json")
+        
         self.factory = ProtoBlockFactory()
 
 
@@ -49,12 +54,9 @@ class DynamicProcessor:
 if __name__ == "__main__":
     import numpy as np
     import time
-    
-
 
     processor = DynamicProcessor()
     processor.generate_protoblock()
-
 
     img_camera = np.random.rand(64,64,3).astype(np.float32)
     img_mask_segmentation = np.random.rand(64,64,3).astype(np.float32)
