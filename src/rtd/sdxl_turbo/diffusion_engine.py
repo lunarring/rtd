@@ -750,13 +750,13 @@ class DiffusionEngine():
             config = CompilationConfig.Default()
             config.enable_xformers = True
             config.enable_triton = True
-            config.enable_cuda_graph = False
-            # config.enable_jit = True
-            # config.enable_jit_freeze = True
-            # config.trace_scheduler = True
-            # config.enable_cnn_optimization = True
-            # config.preserve_parameters = False
-            # config.prefer_lowp_gemm = True
+            config.enable_cuda_graph = True
+            config.enable_jit = True
+            config.enable_jit_freeze = True
+            config.trace_scheduler = True
+            config.enable_cnn_optimization = True
+            config.preserve_parameters = True
+            config.prefer_lowp_gemm = True
             pipe = compile(pipe, config)
         self.pipe = pipe
         self.set_latents()
