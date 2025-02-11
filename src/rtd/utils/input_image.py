@@ -177,10 +177,10 @@ class InputImageProcessor():
         
         # human body segmentation mask
         if self.do_human_seg:
-            human_segmmask = self.human_seg.get_mask(img)
+            human_seg_mask = self.human_seg.get_mask(img)
             img = self.human_seg.apply_mask(img)
         else:
-            human_segmmask = None
+            human_seg_mask = None
         
         # adjust brightness
         img = img.astype(np.float32)
@@ -216,12 +216,12 @@ class InputImageProcessor():
         # convert the image back to BGR
         img = cv2.cvtColor(img_hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
         
-        if human_segmmask is not None:
-            human_segmmask *= 255
-            human_segmmask = np.repeat(np.expand_dims(human_segmmask, 2), 3, axis=2)
-            human_segmmask = human_segmmask.astype(np.uint8)
+        if human_seg_mask is not None:
+            human_seg_mask *= 255
+            human_seg_mask = np.repeat(np.expand_dims(human_seg_mask, 2), 3, axis=2)
+            human_seg_mask = human_seg_mask.astype(np.uint8)
         
-        return img, human_segmmask
+        return img, human_seg_mask
 
 
 class AcidProcessor():
@@ -244,10 +244,8 @@ class AcidProcessor():
         self.zoom_factor = 1
         self.rotation_angle = 0
         self.do_acid_tracers = False
-        self.apply_humansegm_mask = False
         self.do_acid_wobblers = False
         self.do_flip_invariance = False
-        self.human_segmmask = None
         self.wobbler_control_kwargs = {}
         self.flip_state = 0
         self.stereo_scaling_applied = False
@@ -279,14 +277,8 @@ class AcidProcessor():
     def set_acid_tracers(self, do_acid_tracers):
         self.do_acid_tracers = do_acid_tracers
 
-    def set_apply_humansegm_mask(self, apply_humansegm_mask):
-        self.apply_humansegm_mask = apply_humansegm_mask
-
     def set_do_acid_wobblers(self, do_acid_wobblers):
         self.do_acid_wobblers = do_acid_wobblers
-
-    def set_human_segmmask(self, human_segmmask):
-        self.human_segmmask = human_segmmask
 
     def set_flip_invariance(self, do_flip_invariance):
         self.do_flip_invariance = do_flip_invariance
@@ -297,7 +289,7 @@ class AcidProcessor():
             self.stereo_scaling_applied = True
     
     # @exception_handler
-    def process(self, image_input):
+    def process(self, image_input, human_seg_mask=None):
         if isinstance(image_input, torch.Tensor):
             image_input = image_input.squeeze(0)
             image_input = image_input.cpu().numpy()
@@ -341,30 +333,24 @@ class AcidProcessor():
         if img_input_torch.shape[0] != height_diffusion or img_input_torch.shape[1] != width_diffusion:
             img_input_torch = lt.resize(img_input_torch.permute((2,0,1)), size=(height_diffusion, width_diffusion)).permute((1,2,0))
         
-        if self.apply_humansegm_mask:
-            if len(self.human_segmmask.shape) == 3:
-                human_segmmask = self.human_segmmask[:,:,0]/255
-            else:
-                human_segmmask = self.human_segmmask
+        if self.do_acid_tracers and human_seg_mask is not None:
+            if len(human_seg_mask.shape) == 3:
+                human_seg_mask = human_seg_mask[:,:,0]/255
                 
-            human_segmmask_resized = np.expand_dims(cv2.resize(human_segmmask, (width_diffusion, height_diffusion)),2)
-            human_segmmask_torch = torch.from_numpy(human_segmmask_resized).to(self.device)
+            human_seg_mask_resized = np.expand_dims(cv2.resize(human_seg_mask, (width_diffusion, height_diffusion)),2)
+            human_seg_mask_torch = torch.from_numpy(human_seg_mask_resized).to(self.device)
         
-        if self.do_acid_tracers and self.apply_humansegm_mask:
             img_input_torch_current = img_input_torch.clone()
             img_input_torch = (1.-self.acid_strength)*img_input_torch + self.acid_strength*last_diffusion_image_torch
-            img_input_torch = human_segmmask_torch*img_input_torch_current + (1-human_segmmask_torch)*img_input_torch
+            img_input_torch = human_seg_mask_torch*img_input_torch_current + (1-human_seg_mask_torch)*img_input_torch
             img_input_torch = (1.-self.acid_strength_foreground)*img_input_torch + self.acid_strength_foreground*last_diffusion_image_torch
         else:
             img_input_torch = (1.-self.acid_strength)*img_input_torch + self.acid_strength*last_diffusion_image_torch
             
-            
         # additive noise
         if self.coef_noise > 0:
             torch.manual_seed(420)
-            t_rand = (torch.randn(img_input_torch.shape, device=img_input_torch.device)) * self.coef_noise * 20
-            if self.apply_humansegm_mask:
-                t_rand *= (1-human_segmmask_torch)
+            t_rand = (torch.rand(img_input_torch.shape, device=img_input_torch.device)[:,:,0].unsqueeze(2) - 0.5) * self.coef_noise * 255
             img_input_torch += t_rand
         
         img_input = img_input_torch.cpu().numpy()
