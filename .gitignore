@@ -1,4 +1,6 @@
 # Byte-compiled / optimized / DLL files
+*.pyc
+*.py~
 .cursorrules
 logs/*
 .tac_*
