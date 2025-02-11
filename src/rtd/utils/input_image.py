@@ -110,7 +110,8 @@ class InputImageProcessor():
         self.brightness = 1.0
         self.saturization = 1.0
         self.hue_rotation_angle = 0
-        self.blur_kernel = None
+        self.blur = None
+        self.blur_kernel = blur_kernel
         self.resizing_factor_humanseg = 0.4 # how much humanseg img is downscaled internally, makes things faster.
         
         # human body segmentation
@@ -139,7 +140,7 @@ class InputImageProcessor():
         self.hue_rotation_angle = hue_rotation_angle
         
     def set_blur_size(self, blur_kernel):
-        if blur_kernel != self.blur_kernel:
+        if blur_kernel != self.blur_kernel or not self.blur:
             self.blur = lt.MedianBlur((blur_kernel, blur_kernel))
         
     def set_blur(self, do_blur=True):
