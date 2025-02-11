@@ -8,7 +8,7 @@ import sys
 
 if __name__ == "__main__":
     # Example for overriding kwargs
-    height_diffusion = 512
+    height_diffusion = 384
     width_diffusion = 512
     shape_hw = (576,1024)
 
