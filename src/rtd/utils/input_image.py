@@ -5,7 +5,6 @@ import torch.nn.functional as F
 from torchvision import transforms
 from .wobblers import WobbleMan
 from .segmentation_detection import HumanSeg
-from lunar_tools import exception_handler
 import lunar_tools as lt
 from PIL import Image
 
@@ -245,11 +244,13 @@ class AcidProcessor():
         self.zoom_factor = 1
         self.rotation_angle = 0
         self.do_acid_tracers = False
+        
         self.do_acid_wobblers = False
         self.do_flip_invariance = False
         self.wobbler_control_kwargs = {}
         self.flip_state = 0
         self.stereo_scaling_applied = False
+        self.color_matching = 0.0
 
     def set_wobbler_control_kwargs(self, wobbler_control_kwargs):
         self.wobbler_control_kwargs = wobbler_control_kwargs
@@ -288,7 +289,75 @@ class AcidProcessor():
         if not self.stereo_scaling_applied:
             self.height_diffusion = self.height_diffusion * 2
             self.stereo_scaling_applied = True
-    
+            
+    def set_color_matching(self, color_matching):
+        self.color_matching = color_matching
+
+    def multi_match_gpu(self, list_images, weights=None, simple=False, clip_max='auto', gpu=0,  is_input_tensor=False):
+        """
+        Match colors of images according to weights.
+        """
+        from scipy import linalg
+        if is_input_tensor:
+            list_images_gpu = [img.clone().float() for img in list_images]
+        else:
+            list_images_gpu = [torch.from_numpy(img.copy()).float().cuda(gpu) for img in list_images]
+        
+        if clip_max == 'auto':
+            clip_max = 255 if list_images[0].max() > 16 else 1  
+        
+        if weights is None:
+            weights = [1]*len(list_images_gpu)
+        weights = np.array(weights, dtype=np.float32)/sum(weights) 
+        assert len(weights) == len(list_images_gpu)
+        # try:
+        assert simple == False    
+        def cov_colors(img):
+            a, b, c = img.size()
+            img_reshaped = img.view(a*b,c)
+            mu = torch.mean(img_reshaped, 0, keepdim=True)
+            img_reshaped -= mu
+            cov = torch.mm(img_reshaped.t(), img_reshaped) / img_reshaped.shape[0]
+            return cov, mu
+        
+        covs = np.zeros((len(list_images_gpu),3,3), dtype=np.float32)
+        mus = torch.zeros((len(list_images_gpu),3)).float().cuda(gpu)
+        mu_target = torch.zeros((1,1,3)).float().cuda(gpu)
+        #cov_target = np.zeros((3,3), dtype=np.float32)
+        for i, img in enumerate(list_images_gpu):
+            cov, mu = cov_colors(img)
+            mus[i,:] = mu
+            covs[i,:,:]= cov.cpu().numpy()
+            mu_target += mu * weights[i]
+                
+        cov_target = np.sum(weights.reshape(-1,1,1)*covs, 0)
+        covs += np.eye(3, dtype=np.float32)*1
+        
+        # inversion_fail = False
+        try:
+            sqrtK = linalg.sqrtm(cov_target)
+            assert np.isnan(sqrtK.mean()) == False
+        except Exception as e:
+            # inversion_fail = True
+            sqrtK = linalg.sqrtm(cov_target + np.random.rand(3,3)*0.01)
+        list_images_new = []
+        for i, img in enumerate(list_images_gpu):
+            
+            Ms = np.real(np.matmul(sqrtK, linalg.inv(linalg.sqrtm(covs[i]))))
+            Ms = torch.from_numpy(Ms).float().cuda(gpu)
+            #img_new = img - mus[i]
+            img_new = torch.mm(img.view([img.shape[0]*img.shape[1],3]), Ms.t())
+            img_new = img_new.view([img.shape[0],img.shape[1],3]) + mu_target
+            
+            img_new = torch.clamp(img_new, 0, clip_max)
+
+            assert torch.isnan(img_new).max().item() == False
+            if is_input_tensor:
+                list_images_new.append(img_new)
+            else:
+                list_images_new.append(img_new.cpu().numpy())
+        return list_images_new
+
     # @exception_handler
     def process(self, image_input, human_seg_mask=None):
         if isinstance(image_input, torch.Tensor):
@@ -354,6 +423,36 @@ class AcidProcessor():
             t_rand = (torch.rand(img_input_torch.shape, device=img_input_torch.device)[:,:,0].unsqueeze(2) - 0.5) * self.coef_noise * 255
             img_input_torch += t_rand
         
+        # Apply color matching if enabled
+        if self.color_matching > 0.01:
+            if human_seg_mask is not None:
+                if human_seg_mask.ndim == 2:
+                    human_seg_mask = np.expand_dims(human_seg_mask, axis=2)
+                mask_torch = F.interpolate(
+                    torch.from_numpy(human_seg_mask).to(self.device).float().permute(2, 0, 1).unsqueeze(0),
+                    size=last_diffusion_image_torch.shape[:2],
+                    mode='bilinear',
+                    align_corners=False
+                ).squeeze(0).permute(1, 2, 0)
+                # Use binary mask by applying the mask directly
+                last_diffusion_image_torch_masked = last_diffusion_image_torch #* mask_torch
+                img_input_torch, _ = self.multi_match_gpu(
+                    [img_input_torch, last_diffusion_image_torch_masked],
+                    weights=[1 - self.color_matching, self.color_matching],
+                    clip_max='auto',
+                    gpu=0,
+                    is_input_tensor=True
+                )
+            else:
+                img_input_torch, _ = self.multi_match_gpu(
+                    [img_input_torch, last_diffusion_image_torch],
+                    weights=[1 - self.color_matching, self.color_matching],
+                    clip_max='auto',
+                    gpu=0,
+                    is_input_tensor=True
+                )
+
+
         img_input = img_input_torch.cpu().numpy()
         return img_input
     

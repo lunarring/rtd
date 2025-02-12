@@ -6,19 +6,18 @@ build-backend = "setuptools.build_meta"
 name = "rtd"
 version = "0.1.0"
 description = "Real-time diffusion tools"
-authors = [
-  { name = "Your Name", email = "info@lunar-ring.ai" }
-]
+authors = [{ name = "Your Name", email = "info@lunar-ring.ai" }]
 license = { text = "MIT" }
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = [
-  "huggingface_hub==0.25.0",
+  "huggingface_hub==0.25.1",
+  "diffusers==0.27.0",
   "tokenizers>=0.20,<0.21",
   "diffusers",
   "torch",
   "Pillow",
-  "numpy"
+  "numpy",
 ]
 
 [tool.setuptools.packages.find]
