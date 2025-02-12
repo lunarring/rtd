@@ -13,23 +13,30 @@ if __name__ == "__main__":
     width_render = 1920
     shape_hw_cam = (576,1024)
     do_compile = True
+    do_diffusion = True
+    device = 'cuda:0'
 
-    #  torch.Size([1, 4, 48, 64])
+    if do_diffusion:
+        device = 'cuda:0'
+    else:
+        device = 'cpu'
 
     init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
 
     akai_lpd8 = lt.MidiInput(device_name="akai_lpd8")
-    de_img = DiffusionEngine(use_image2image=True, height_diffusion_desired=height_diffusion, width_diffusion_desired=width_diffusion, do_compile=do_compile)
+    de_img = DiffusionEngine(use_image2image=True, height_diffusion_desired=height_diffusion, width_diffusion_desired=width_diffusion, 
+                             do_compile=do_compile, do_diffusion=do_diffusion, device=device)
     em = EmbeddingsMixer(de_img.pipe)
-    embeds = em.encode_prompt(init_prompt)
-    de_img.set_embeddings(embeds)
+    if do_diffusion:
+        embeds = em.encode_prompt(init_prompt)
+        de_img.set_embeddings(embeds)
 
     renderer = lt.Renderer(width=width_render, height=height_render, backend='opencv', do_fullscreen=False)
     cam = lt.WebCam(shape_hw=shape_hw_cam)
-    input_image_processor = InputImageProcessor()
+    input_image_processor = InputImageProcessor(device=device)
     input_image_processor.set_flip(do_flip=True, flip_axis=1)
 
-    acid_processor = AcidProcessor(height_diffusion=height_diffusion, width_diffusion=width_diffusion)
+    acid_processor = AcidProcessor(height_diffusion=height_diffusion, width_diffusion=width_diffusion, device=device)
 
     prompt_provider = PromptProviderMicrophone(init_prompt=init_prompt)
 
@@ -37,7 +44,7 @@ if __name__ == "__main__":
     fps_tracker = lt.FPSTracker()
 
     while True:
-        do_human_seg = akai_lpd8.get("A0", button_mode='toggle', val_default=True) 
+        do_human_seg = akai_lpd8.get("A0", button_mode='toggle', val_default=False) 
         mic_button_state = akai_lpd8.get("A1", button_mode='held_down') 
         do_blur = akai_lpd8.get("B0", button_mode='toggle', val_default=True) 
         do_acid_tracers = akai_lpd8.get("B1", button_mode='toggle', val_default=True) 
@@ -52,8 +59,9 @@ if __name__ == "__main__":
         if prompt_provider.new_prompt_available():
             current_prompt = prompt_provider.get_current_prompt()
             print(f"New prompt: {current_prompt}")
-            embeds = em.encode_prompt(current_prompt)
-            de_img.set_embeddings(embeds)
+            if do_diffusion:
+                embeds = em.encode_prompt(current_prompt)
+                de_img.set_embeddings(embeds)
             
         img_cam = cam.get_img()
         # Start timing image processing

@@ -23,11 +23,13 @@ class HumanSeg:
         preprocess: The preprocessing transformations applied on the input image before feeding it to the model.
     """
     # 
-    def __init__(self, model_name='deeplabv3_resnet101', resizing_factor=None, size=None):
+    def __init__(self, model_name='deeplabv3_resnet101', resizing_factor=None, size=None, device='cuda'):
         self.model = torch.hub.load('pytorch/vision:v0.10.0', model_name, pretrained=True)
         
+        self.device = device
+
         self.model.eval()
-        self.model.to('cuda')
+        self.model.to(self.device)
         
         self.preprocess = transforms.Compose([
             transforms.ToTensor(),
@@ -72,7 +74,7 @@ class HumanSeg:
         input_batch = input_tensor.unsqueeze(0) # create a mini-batch as expected by the model
         
         # move the input and model to GPU for speed if available
-        input_batch = input_batch.to('cuda')
+        input_batch = input_batch.to(self.device)
         
         with torch.no_grad():
             output = self.model(input_batch)['out'][0]

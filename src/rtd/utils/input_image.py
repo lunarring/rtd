@@ -107,7 +107,8 @@ def torch_rotate(x, a):
 
 
 class InputImageProcessor():
-    def __init__(self, do_human_seg=True, do_blur=False, blur_kernel=3, is_infrared=False):
+    def __init__(self, do_human_seg=True, do_blur=False, blur_kernel=3, is_infrared=False, device='cuda'):
+        self.device = device
         self.brightness = 1.0
         self.saturization = 1.0
         self.hue_rotation_angle = 0
@@ -116,7 +117,7 @@ class InputImageProcessor():
         self.resizing_factor_humanseg = 0.4 # how much humanseg img is downscaled internally, makes things faster.
         
         # human body segmentation
-        self.human_seg = HumanSeg(resizing_factor=self.resizing_factor_humanseg)
+        self.human_seg = HumanSeg(resizing_factor=self.resizing_factor_humanseg, device=device)
         self.set_blur_size(self.blur_kernel)
         
         self.do_human_seg = do_human_seg
@@ -172,7 +173,7 @@ class InputImageProcessor():
             img = np.flip(img, axis=self.flip_axis)
         
         if self.do_blur:
-            img_torch = torch.from_numpy(img.copy()).to(0).float()
+            img_torch = torch.from_numpy(img.copy()).to(self.device).float()
             img = self.blur(img_torch.permute([2,0,1])[None])[0].permute([1,2,0]).cpu().numpy()
         
         # human body segmentation mask
@@ -225,7 +226,7 @@ class InputImageProcessor():
 
 
 class AcidProcessor():
-    def __init__(self, device='cuda', 
+    def __init__(self, device='cuda:0', 
                  height_diffusion=576, 
                  width_diffusion=1024):
         self.device = device
@@ -233,7 +234,7 @@ class AcidProcessor():
         self.width_diffusion = width_diffusion
         self.height_diffusion = height_diffusion
         
-        self.wobbleman = WobbleMan(device)
+        self.wobbleman = WobbleMan(device=device)
         self.wobbleman.init('a01')
 
         self.acid_strength = 0.05

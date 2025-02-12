@@ -4,14 +4,14 @@ import torch
 import time
 
 #%%
-def get_cartesian_resample_grid(shape_hw, gpu, use_half_precision=False):
+def get_cartesian_resample_grid(shape_hw, use_half_precision=False, device='cuda'):
     # initialize reesampling Cartesian grid
-    theta = torch.zeros((1,2,3)).cuda(gpu)
+    theta = torch.zeros((1,2,3)).to(device)
     theta[0,0,0] = 1
     theta[0,1,1] = 1
     
     basegrid = F.affine_grid(theta, (1, 2, shape_hw[0], shape_hw[1]))
-    iResolution = torch.tensor([shape_hw[0], shape_hw[1]]).float().cuda(gpu).unsqueeze(0).unsqueeze(0)
+    iResolution = torch.tensor([shape_hw[0], shape_hw[1]]).float().to(device).unsqueeze(0).unsqueeze(0)
 
     grid = (basegrid[0,:,:,:] + 1) / 2
     grid *= iResolution
@@ -22,10 +22,10 @@ def get_cartesian_resample_grid(shape_hw, gpu, use_half_precision=False):
         
     return cartesian_resample_grid
 
-def get_kernel_cdiff(gpu=None):
+def get_kernel_cdiff(device='cuda:0'):
     g = np.ones((3,3))
     g[1,1] = -8
-    return get_kernel(g, gpu)
+    return get_kernel(g, device=device)
 
 def apply_kernel(img, kernel, nmb_repetitions=1):
     if len(img.shape)==2:
@@ -40,24 +40,23 @@ def apply_kernel(img, kernel, nmb_repetitions=1):
         
     return img.squeeze()
 
-def get_kernel(kernel_weights, gpu=None):
-    assert gpu is not None, "pythoniac maniac gpuiac"
+def get_kernel(kernel_weights, device='cuda'):
     assert len(kernel_weights.shape) == 2, '2D conv!'
     assert kernel_weights.shape[0] == kernel_weights.shape[1], 'square!'
     padding = int((kernel_weights.shape[0]-1) / 2)
     m = torch.nn.Conv2d(1, 1, kernel_weights.shape[0], padding=padding, stride=1)
     m.bias[0] = 0
     m.weight[0,0,:,:] = torch.from_numpy(kernel_weights.astype(np.float32))
-    m = m.cuda(gpu)
+    m = m.to(device)
     return m
 
-def get_kernel_gauss(ksize=3, gpu=None):
+def get_kernel_gauss(ksize=3, device='cuda:0'):
     x, y = np.meshgrid(np.linspace(-1,1,ksize), np.linspace(-1,1,ksize))
     d = np.sqrt(x*x+y*y)
     sigma, mu = 1.0, 0.0
     g = np.exp(-( (d-mu)**2 / ( 2.0 * sigma**2 ) ) )
     g = g/np.sum(g)
-    return get_kernel(g, gpu)
+    return get_kernel(g, device=device)
 
 class TimeMan():
     def __init__(self, use_counter=False, count_time_increment=0.02):
@@ -109,8 +108,8 @@ class TimeMan():
             self.t_last = time.perf_counter()
             
 class WobbleMan():
-    def __init__(self, gpu, time_man=None):
-        self.gpu = gpu
+    def __init__(self, time_man=None, device='cuda'):
+        self.device = device
         self.do_acid = self.do_acid_not_init
         
         if time_man is None:
@@ -120,8 +119,8 @@ class WobbleMan():
         
         with torch.no_grad():
             self.cartesian_resample_grid = None
-            self.gkernel = get_kernel_gauss(gpu=gpu)
-            self.ckernel = get_kernel_cdiff(gpu=gpu)
+            self.gkernel = get_kernel_gauss(device=device)
+            self.ckernel = get_kernel_cdiff(device=device)
         self.ran_once = False
         
         
@@ -129,8 +128,8 @@ class WobbleMan():
         print("ACID NOT INITIALIZED! run e.g. init_j01")
         
     
-    def get_resample_grid(self, shape_hw):
-        resample_grid = get_cartesian_resample_grid(shape_hw, self.gpu)
+    def get_resample_grid(self, shape_hw, device='cuda'):
+        resample_grid = get_cartesian_resample_grid(shape_hw, device=device)
         return resample_grid
 
     
@@ -195,7 +194,7 @@ class WobbleMan():
         h_edges = edges * x_wobble * amp
         
         shape_hw = source.shape
-        resample_grid = self.get_resample_grid(shape_hw)
+        resample_grid = self.get_resample_grid(shape_hw, device=self.device)
         self.identity_resample_grid = resample_grid.clone()
         resample_grid[:,:,0] += v_edges
         resample_grid[:,:,1] += h_edges

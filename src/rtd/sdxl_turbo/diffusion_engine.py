@@ -662,12 +662,14 @@ class DiffusionEngine():
         width_diffusion_desired = 512,
         use_image2image = True,
         use_tinyautoenc = True,
-        device = 'cuda',
+        device = 'cuda:0',
         hf_model = 'stabilityai/sdxl-turbo',
-        do_compile = False
+        do_compile = False,
+        do_diffusion = True
     ):
         self._init_resolution(height_diffusion_desired, width_diffusion_desired)
         self.do_compile = do_compile
+        self.do_diffusion = do_diffusion
         self.use_tinyautoenc = use_tinyautoenc
         self.device = device
         self.hf_model = hf_model
@@ -689,6 +691,11 @@ class DiffusionEngine():
         torch.backends.cudnn.allow_tf32 = False 
 
         self.use_image2image = use_image2image
+
+        if not self.do_diffusion:
+            self.device = 'cpu'
+            self.do_compile = False
+
         if self.use_image2image:
             self._init_image2image()
         else:
@@ -738,7 +745,7 @@ class DiffusionEngine():
         pipe.to(self.device)
         if self.use_tinyautoenc:
             pipe.vae = AutoencoderTiny.from_pretrained('madebyollin/taesdxl', torch_device=self.device, torch_dtype=torch.float16)
-        pipe.vae = pipe.vae.cuda()
+        pipe.vae = pipe.vae.to(self.device)
         pipe.set_progress_bar_config(disable=True)
         pipe.unet.forward = forward_modulated.__get__(pipe.unet, UNet2DConditionModel)
         if self.use_image2image:
@@ -775,8 +782,10 @@ class DiffusionEngine():
             torch.manual_seed(self.seed)
         else:
             torch.manual_seed(force_seed)
+
+        latents = torch.randn((1, 4, self.height_latents, self.width_latents)).half().to(self.device)
             
-        return torch.randn((1, 4, self.height_latents, self.width_latents)).half().cuda()
+        return latents
 
     def set_num_inference_steps(self, num_inference_steps, force_minimum_strength=True):
         """Sets the number of inference steps."""
@@ -954,6 +963,9 @@ class DiffusionEngine():
         Raises:
             AssertionError: If embeddings are not set.
         """
+        if not self.do_diffusion:
+            return self.image_init
+
         assert self.embeds is not None, "Embeddings not set! Call set_embeddings first."
         
         torch.manual_seed(self.seed)
@@ -1041,15 +1053,18 @@ class StereoDiffusionEngine(DiffusionEngine):
         # Then build the cross_attention_kwargs from the class attributes
         kwargs = self.build_cross_attention_kwargs(kwargs, cross_attention_kwargs_override)
         
-        if self.do_stereo_image:
-            img_diffusion = []                
-            for img_eye in self.image_init:
-                kwargs['image'] = img_eye
-                img_eye_diffusion = self.pipe(**kwargs).images[0]
-                img_diffusion.append(np.array(img_eye_diffusion))
-            img_diffusion = np.vstack(img_diffusion)
+        if self.do_diffusion:
+            if self.do_stereo_image:
+                img_diffusion = []                
+                for img_eye in self.image_init:
+                    kwargs['image'] = img_eye
+                    img_eye_diffusion = self.pipe(**kwargs).images[0]
+                    img_diffusion.append(np.array(img_eye_diffusion))
+                img_diffusion = np.vstack(img_diffusion)
+            else:
+                img_diffusion = self.pipe(**kwargs).images[0]
         else:
-            img_diffusion = self.pipe(**kwargs).images[0]
+            img_diffusion = None
     
         return img_diffusion
 
