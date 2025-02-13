@@ -50,7 +50,12 @@ class DynamicProcessor:
             spec.loader.exec_module(self.dynamic_module)
             self.module_hash = current_hash
         if self.dynamic_module:
-            x = self.dynamic_module.process(img_camera, img_mask_segmentation, img_diffusion, dynamic_func_coef=dynamic_func_coef)
+            if hasattr(self.dynamic_module, "DynamicProcessorClass"):
+                if not hasattr(self, "_dynamic_processor_instance") or self._dynamic_processor_instance is None:
+                    self._dynamic_processor_instance = self.dynamic_module.DynamicProcessorClass()
+                x = self._dynamic_processor_instance.process(img_camera, img_mask_segmentation, img_diffusion, dynamic_func_coef=dynamic_func_coef)
+            else:
+                x = self.dynamic_module.process(img_camera, img_mask_segmentation, img_diffusion, dynamic_func_coef=dynamic_func_coef)
             return np.flip(x, axis=1)
         else:
             return img_camera
