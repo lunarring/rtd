@@ -79,7 +79,6 @@ class DynamicProcessor:
         )
         self.factory.save_protoblock(protoblock, self.fp_proto)
         self.protoblock = protoblock
-        return protoblock
 
     def execute_protoblock(self):
         # Create config override dictionary to disable git and plausibility check
@@ -93,20 +92,29 @@ class DynamicProcessor:
         # Execute the block (this will run tests, make changes, etc.)
         executor.execute_block()
 
+    def update_protoblock(self):
+        task_user = "let us just use the human segmentation mask and fill it with noise"
+        task_static = "the input of the function are three numpy arrays that are images: img_camera, img_mask_segmentation, img_diffusion, which are all float32. we need one numpy array as output. it has to pass the existing test. make sure the function name is called 'process'."
+        task_description = task_user + "\n" + task_static
+
+        self.generate_protoblock(task_description)
+        self.execute_protoblock()
+
 
 if __name__ == "__main__":
     import numpy as np
     import time
 
     processor = DynamicProcessor()
+    processor.update_protoblock()
 
-    task_user = "let us make an interesting function that takes the camera images and adds it to itself flipped left to right, and ensure that the range of values is the same as in the input images."
-    task_static = "the input of the function are three numpy arrays that are images: img_camera, img_mask_segmentation, img_diffusion, which are all float32. we need one numpy array as output. it has to pass the existing test. make sure the function name is called 'process'."
-    task_description = task_user + "\n" + task_static
+    # task_user = "let us make an interesting function that takes the camera images and adds it to itself flipped left to right, and ensure that the range of values is the same as in the input images."
+    # task_static = "the input of the function are three numpy arrays that are images: img_camera, img_mask_segmentation, img_diffusion, which are all float32. we need one numpy array as output. it has to pass the existing test. make sure the function name is called 'process'."
+    # task_description = task_user + "\n" + task_static
 
-    protoblock = processor.generate_protoblock(task_description)
+    # protoblock = processor.generate_protoblock(task_description)
 
-    processor.execute_protoblock()
+    # processor.execute_protoblock()
 
     # # Execute tac make command
     # import subprocess

@@ -10,6 +10,7 @@ from rtd.utils.prompt_provider import (
 import time
 from rtd.utils.frame_interpolation import AverageFrameInterpolator
 
+
 if __name__ == "__main__":
     height_diffusion = 384 + 96  # 12 * (384 + 96) // 8
     width_diffusion = 512 + 128  # 12 * (512 + 128) // 8
@@ -17,13 +18,16 @@ if __name__ == "__main__":
     width_render = 1920
     n_frame_interpolations: int = 5
     shape_hw_cam = (576, 1024)
-    do_compile = True
+    do_compile = False
     do_diffusion = True
     do_fullscreen = False
     do_dynamic_processor = True
     device = "cuda:0"
     img_diffusion = None
 
+    if do_dynamic_processor:
+        assert not do_compile
+        dynamic_processor = DynamicProcessor()
     if do_diffusion:
         device = "cuda:0"
     else:
@@ -45,7 +49,6 @@ if __name__ == "__main__":
     if do_diffusion:
         embeds = em.encode_prompt(init_prompt)
         de_img.set_embeddings(embeds)
-
     renderer = lt.Renderer(
         width=width_render,
         height=height_render,
@@ -64,14 +67,11 @@ if __name__ == "__main__":
 
     prompt_provider = PromptProviderMicrophoneTxt(file_path="/home/lugo/git/rtd/prompts/ShamelessVisualization.txt")
 
-    if do_dynamic_processor:
-        dynamic_processor = DynamicProcessor()
-
     # Initialize FPS tracking
     fps_tracker = lt.FPSTracker()
 
     # Frame interpolator for smooth transitions
-    frame_interpolator = AverageFrameInterpolator(num_frames=n_frame_interpolations)
+    # frame_interpolator = AverageFrameInterpolator(num_frames=n_frame_interpolations)
 
     while True:
         t_processing_start = time.time()
@@ -79,7 +79,8 @@ if __name__ == "__main__":
         do_human_seg = akai_lpd8.get("A0", button_mode="toggle", val_default=True)
         mic_button_state = akai_lpd8.get("A1", button_mode="held_down")
         cycle_prompt = akai_lpd8.get("C0", button_mode="pressed_once")
-        do_blur = akai_lpd8.get("B0", button_mode="toggle", val_default=True)
+        do_blur = True
+        inject_dyn_prompt = akai_lpd8.get("B0", button_mode="pressed_once")
         do_acid_tracers = akai_lpd8.get("B1", button_mode="toggle", val_default=True)
         do_acid_wobblers = akai_lpd8.get("C1", button_mode="toggle", val_default=False)
         do_debug_seethrough = akai_lpd8.get("D1", button_mode="toggle", val_default=False)
@@ -108,6 +109,8 @@ if __name__ == "__main__":
         input_image_processor.set_blur(do_blur)
         img_proc, human_seg_mask = input_image_processor.process(img_cam)
 
+        if inject_dyn_prompt:
+            dynamic_processor.update_protoblock()
         if do_dynamic_processor and img_diffusion is not None:
             img_acid = dynamic_processor.process(img_cam, human_seg_mask, img_diffusion)
             img_proc = img_acid
