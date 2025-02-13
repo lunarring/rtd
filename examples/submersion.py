@@ -20,7 +20,7 @@ if __name__ == "__main__":
     shape_hw_cam = (576, 1024)
     do_compile = False
     do_diffusion = True
-    do_fullscreen = False
+    do_fullscreen = True
     do_dynamic_processor = True
     device = "cuda:0"
     img_diffusion = None

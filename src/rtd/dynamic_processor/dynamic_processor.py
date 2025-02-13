@@ -34,6 +34,7 @@ class DynamicProcessor:
             return img_camera
         img_camera = np.asarray(img_camera)
         img_mask_segmentation = np.asarray(img_mask_segmentation)
+        img_mask_segmentation = np.flip(img_mask_segmentation, axis=1)
         img_diffusion = np.asarray(img_diffusion)
 
         img_camera = lt.resize(img_camera, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
@@ -49,7 +50,8 @@ class DynamicProcessor:
             spec.loader.exec_module(self.dynamic_module)
             self.module_hash = current_hash
         if self.dynamic_module:
-            return self.dynamic_module.process(img_camera, img_mask_segmentation, img_diffusion, dynamic_func_coef=dynamic_func_coef)
+            x = self.dynamic_module.process(img_camera, img_mask_segmentation, img_diffusion, dynamic_func_coef=dynamic_func_coef)
+            return np.flip(x, axis=1)
         else:
             return img_camera
 
@@ -119,7 +121,7 @@ class DynamicProcessor:
         # Inject confirmation message
         voice_ui.inject_message("I understand your request. I will now start programming according to your instructions.")
 
-        task_static = "the input of the function are three numpy arrays that are images: img_camera, img_mask_segmentation, img_diffusion, which are all float32. we need one numpy array as output. it has to pass the existing test. make sure the function name is called 'process'."
+        task_static = "the input of the function are three numpy arrays that are images and one float parameter: img_camera, img_mask_segmentation, img_diffusion, dynamic_func_coef, which are all float32. we need one numpy array as output. it has to pass the existing test. make sure the function name is called 'process'."
         task_description = task_user + "\n" + task_static
 
         self.generate_protoblock(task_description)
