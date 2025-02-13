@@ -103,7 +103,7 @@ class DynamicProcessor:
 
     def update_protoblock(self):
         task_user = "let us just use the human segmentation mask and fill it with noise"
-        task_static = "the input of the function are three numpy arrays that are images: img_camera, img_mask_segmentation, img_diffusion, which are all float32. we need one numpy array as output. it has to pass the existing test. make sure the function name is called 'process'."
+        task_static = "the input of the function are three numpy arrays that are images: img_camera, img_mask_segmentation, img_diffusion, which are all float32. also we get a float parameter [0,1] called dynamic_func_coef.we need one numpy array as output. it has to pass the existing test. make sure the function name is called 'process'."
         task_description = task_user + "\n" + task_static
 
         self.generate_protoblock(task_description)
