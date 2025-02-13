@@ -1,9 +1,13 @@
+import numpy as np
+import lunar_tools as lt
 import importlib.util
+import importlib.resources
 import hashlib
 import os
 from tac.protoblock.protoblock import ProtoBlock
 from tac.protoblock.factory import ProtoBlockFactory
 from tac.core.executor import ProtoBlockExecutor
+import rtd.dynamic_processor
 
 
 class DynamicProcessor:
@@ -12,29 +16,39 @@ class DynamicProcessor:
         # Use default base_dir if none provided
         self.base_dir = "."
 
-        # Assemble full paths
-        self.fp_func = os.path.join(self.base_dir, "dynamic_module.py")
-        self.fp_test = os.path.join(self.base_dir, "tests/test_dynamic_module.py")
-        self.fp_proto = os.path.join(self.base_dir, "dynamic_module.json")
+        # Use importlib.resources to get package paths
+        with importlib.resources.path("rtd.dynamic_processor", "dynamic_module.py") as p:
+            self.fp_func = str(p)
+        with importlib.resources.path("rtd.dynamic_processor.tests", "test_dynamic_module.py") as p:
+            self.fp_test = str(p)
+        with importlib.resources.path("rtd.dynamic_processor", "dynamic_module.json") as p:
+            self.fp_proto = str(p)
 
         self.factory = ProtoBlockFactory()
         self.protoblock = None
+        self.dynamic_module = None
 
-    def compute_effect(self, img_camera, img_mask_segmentation, img_diffusion):
-        module_path = os.path.expanduser(self.fp_func)
-        current_hash = self._compute_file_hash(module_path)
+    def process(self, img_camera, img_mask_segmentation, img_diffusion):
+        img_camera = np.asarray(img_camera)
+        img_mask_segmentation = np.asarray(img_mask_segmentation)
+        img_diffusion = np.asarray(img_diffusion)
+
+        img_camera = lt.resize(img_camera, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
+        img_mask_segmentation = lt.resize(img_mask_segmentation, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
+
+        # Use the already resolved path from importlib.resources
+        current_hash = self._compute_file_hash(self.fp_func)
 
         if self.module_hash is None or self.module_hash != current_hash:
-            spec = importlib.util.spec_from_file_location("dynamic_module", module_path)
-            dynamic_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(dynamic_module)
+            print("Dynamic module changed, reloading")
+            spec = importlib.util.spec_from_file_location("dynamic_module", self.fp_func)
+            self.dynamic_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(self.dynamic_module)
             self.module_hash = current_hash
-
-            img_camera = dynamic_module.compute_effect(
-                img_camera, img_mask_segmentation, img_diffusion
-            )
-
-        return img_camera
+        if self.dynamic_module:
+            return self.dynamic_module.process(img_camera, img_mask_segmentation, img_diffusion)
+        else:
+            return img_camera
 
     def _compute_file_hash(self, file_path: str) -> str:
         """Compute SHA-256 hash of file contents"""
@@ -74,9 +88,7 @@ class DynamicProcessor:
         config_override["general"] = {"plausibility_test": False}
 
         # Create executor with the protoblock and config override
-        executor = ProtoBlockExecutor(
-            protoblock=self.protoblock, config_override=config_override, codebase=""
-        )
+        executor = ProtoBlockExecutor(protoblock=self.protoblock, config_override=config_override, codebase="")
 
         # Execute the block (this will run tests, make changes, etc.)
         executor.execute_block()

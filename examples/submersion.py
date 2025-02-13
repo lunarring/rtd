@@ -1,6 +1,7 @@
 from rtd.sdxl_turbo.diffusion_engine import DiffusionEngine
 from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
 import lunar_tools as lt
+from rtd.dynamic_processor.dynamic_processor import DynamicProcessor
 from rtd.utils.input_image import InputImageProcessor, AcidProcessor
 from rtd.utils.prompt_provider import (
     PromptProviderMicrophone,
@@ -18,8 +19,10 @@ if __name__ == "__main__":
     shape_hw_cam = (576, 1024)
     do_compile = True
     do_diffusion = True
-    do_fullscreen = True
+    do_fullscreen = False
+    do_dynamic_processor = True
     device = "cuda:0"
+    img_diffusion = None
 
     if do_diffusion:
         device = "cuda:0"
@@ -59,9 +62,10 @@ if __name__ == "__main__":
         device=device,
     )
 
-    prompt_provider = PromptProviderMicrophoneTxt(
-        file_path="/home/lugo/git/rtd/prompts/ShamelessVisualization.txt"
-    )
+    prompt_provider = PromptProviderMicrophoneTxt(file_path="/home/lugo/git/rtd/prompts/ShamelessVisualization.txt")
+
+    if do_dynamic_processor:
+        dynamic_processor = DynamicProcessor()
 
     # Initialize FPS tracking
     fps_tracker = lt.FPSTracker()
@@ -78,13 +82,9 @@ if __name__ == "__main__":
         do_blur = akai_lpd8.get("B0", button_mode="toggle", val_default=True)
         do_acid_tracers = akai_lpd8.get("B1", button_mode="toggle", val_default=True)
         do_acid_wobblers = akai_lpd8.get("C1", button_mode="toggle", val_default=False)
-        do_debug_seethrough = akai_lpd8.get(
-            "D1", button_mode="toggle", val_default=False
-        )
+        do_debug_seethrough = akai_lpd8.get("D1", button_mode="toggle", val_default=False)
         acid_strength = akai_lpd8.get("E0", val_min=0, val_max=1.0, val_default=0.11)
-        acid_strength_foreground = akai_lpd8.get(
-            "E1", val_min=0, val_max=1.0, val_default=0.11
-        )
+        acid_strength_foreground = akai_lpd8.get("E1", val_min=0, val_max=1.0, val_default=0.11)
         coef_noise = akai_lpd8.get("F0", val_min=0, val_max=1.0, val_default=0.15)
         zoom_factor = akai_lpd8.get("F1", val_min=0.5, val_max=1.5, val_default=1.0)
         x_shift = int(akai_lpd8.get("H0", val_min=-50, val_max=50, val_default=0))
@@ -108,17 +108,21 @@ if __name__ == "__main__":
         input_image_processor.set_blur(do_blur)
         img_proc, human_seg_mask = input_image_processor.process(img_cam)
 
-        # Acid
-        acid_processor.set_acid_strength(acid_strength)
-        acid_processor.set_coef_noise(coef_noise)
-        acid_processor.set_acid_tracers(do_acid_tracers)
-        acid_processor.set_acid_strength_foreground(acid_strength_foreground)
-        acid_processor.set_zoom_factor(zoom_factor)
-        acid_processor.set_x_shift(x_shift)
-        acid_processor.set_y_shift(y_shift)
-        acid_processor.set_do_acid_wobblers(do_acid_wobblers)
-        acid_processor.set_color_matching(color_matching)
-        img_acid = acid_processor.process(img_proc, human_seg_mask)
+        if do_dynamic_processor and img_diffusion is not None:
+            img_acid = dynamic_processor.process(img_cam, human_seg_mask, img_diffusion)
+            img_proc = img_acid
+        else:
+            # Acid
+            acid_processor.set_acid_strength(acid_strength)
+            acid_processor.set_coef_noise(coef_noise)
+            acid_processor.set_acid_tracers(do_acid_tracers)
+            acid_processor.set_acid_strength_foreground(acid_strength_foreground)
+            acid_processor.set_zoom_factor(zoom_factor)
+            acid_processor.set_x_shift(x_shift)
+            acid_processor.set_y_shift(y_shift)
+            acid_processor.set_do_acid_wobblers(do_acid_wobblers)
+            acid_processor.set_color_matching(color_matching)
+            img_acid = acid_processor.process(img_proc, human_seg_mask)
 
         # Start timing diffusion
         fps_tracker.start_segment("Acid Proc")
@@ -132,13 +136,11 @@ if __name__ == "__main__":
         acid_processor.update(img_diffusion)
 
         fps_tracker.start_segment("Interpolation")
-        interpolated_frames = frame_interpolator.interpolate(img_diffusion)
+        # interpolated_frames = frame_interpolator.interpolate(img_diffusion)
 
         fps_tracker.start_segment("Rendering")
         t_processing = time.time() - t_processing_start
-        for frame in interpolated_frames:
-            renderer.render(img_proc if do_debug_seethrough else frame)
-            time.sleep(t_processing / 10)
+        # for frame in interpolated_frames:
         renderer.render(img_proc if do_debug_seethrough else img_diffusion)
 
         # Update and display FPS (this will also handle the last segment timing)
