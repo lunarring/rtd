@@ -1,4 +1,6 @@
 # Byte-compiled / optimized / DLL files
+prompts/*
+dynamic_module.json
 dynamic_module.py
 *.pyc
 *.py~

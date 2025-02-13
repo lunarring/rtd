@@ -15,7 +15,7 @@ class DynamicProcessor:
         # Assemble full paths
         self.fp_func = os.path.join(self.base_dir, "dynamic_module.py")
         self.fp_test = os.path.join(self.base_dir, "tests/test_dynamic_module.py")
-        self.fp_proto = os.path.join(self.base_dir, "module.json")
+        self.fp_proto = os.path.join(self.base_dir, "dynamic_module.json")
 
         self.factory = ProtoBlockFactory()
         self.protoblock = None
