@@ -33,8 +33,8 @@ if __name__ == "__main__":
     else:
         device = "cpu"
 
-    # init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
-    init_prompt = "Normal naked people"
+    init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
+    # init_prompt = "Normal naked people"
 
     akai_lpd8 = lt.MidiInput(device_name="akai_lpd8")
     de_img = DiffusionEngine(
@@ -92,6 +92,8 @@ if __name__ == "__main__":
         y_shift = int(akai_lpd8.get("H1", val_min=-50, val_max=50, val_default=0))
         color_matching = akai_lpd8.get("G0", val_min=0, val_max=1, val_default=0.5)
 
+        dynamic_func_coef = akai_lpd8.get("G1", val_min=0, val_max=1, val_default=0.5)
+
         prompt_provider.handle_mic_button(mic_button_state)
         prompt_provider.handle_prompt_cycling_button(cycle_prompt)
 
@@ -110,9 +112,9 @@ if __name__ == "__main__":
         img_proc, human_seg_mask = input_image_processor.process(img_cam)
 
         if inject_dyn_prompt:
-            dynamic_processor.update_protoblock()
+            dynamic_processor.update_protoblock_voice()
         if do_dynamic_processor and img_diffusion is not None:
-            img_acid = dynamic_processor.process(img_cam, human_seg_mask, img_diffusion)
+            img_acid = dynamic_processor.process(img_cam, human_seg_mask, img_diffusion, dynamic_func_coef=dynamic_func_coef)
             img_proc = img_acid
         else:
             # Acid
