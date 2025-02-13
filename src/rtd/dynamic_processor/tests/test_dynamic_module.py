@@ -33,7 +33,17 @@ class TestDynamicModule(unittest.TestCase):
         process(self.img_camera, self.img_mask, self.img_diffusion)
         elapsed_time = (time.time() - start_time) * 1000  # Convert to milliseconds
         self.assertLess(elapsed_time, 100, f"Processing took {elapsed_time:.2f}ms, which is more than 100ms")
-
-
+    
+    def test_dynamic_func_coef(self):
+        """Test that dynamic_func_coef correctly modulates the diffusion image"""
+        test_coef = 2.0
+        img_mask = np.array([[0.6, 0.4], [0.3, 0.8]], dtype=np.float32)
+        img_camera = np.array([[1.0, 1.0], [1.0, 1.0]], dtype=np.float32)
+        img_diffusion = np.array([[2.0, 2.0], [2.0, 2.0]], dtype=np.float32)
+        expected = np.where(img_mask > 0.5, img_diffusion * test_coef, img_camera).astype(np.float32)
+        result = process(img_camera, img_mask, img_diffusion, dynamic_func_coef=test_coef)
+        np.testing.assert_array_almost_equal(result, expected)
+    
+    
 if __name__ == "__main__":
     unittest.main()
