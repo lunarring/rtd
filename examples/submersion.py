@@ -5,7 +5,7 @@ from rtd.dynamic_processor.processor_dynamic_module import DynamicProcessor
 from rtd.utils.input_image import InputImageProcessor, AcidProcessor
 from rtd.utils.prompt_provider import (
     PromptProviderMicrophone,
-    PromptProviderMicrophoneTxt,
+    PromptProviderTxtFile,
 )
 import time
 import numpy as np
@@ -66,7 +66,7 @@ if __name__ == "__main__":
         device=device,
     )
 
-    prompt_provider = PromptProviderMicrophoneTxt(file_path="/home/lugo/git/rtd/prompts/ShamelessVisualization.txt")
+    prompt_provider = PromptProviderMicrophone()
 
     # Initialize FPS tracking
     fps_tracker = lt.FPSTracker()
@@ -96,7 +96,7 @@ if __name__ == "__main__":
         dynamic_func_coef = akai_lpd8.get("G1", val_min=0, val_max=1, val_default=0.5)
 
         prompt_provider.handle_mic_button(mic_button_state)
-        prompt_provider.handle_prompt_cycling_button(cycle_prompt)
+        # prompt_provider.handle_prompt_cycling_button(cycle_prompt)
 
         if prompt_provider.new_prompt_available():
             current_prompt = prompt_provider.get_current_prompt()

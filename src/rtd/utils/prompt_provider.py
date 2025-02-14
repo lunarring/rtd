@@ -95,31 +95,7 @@ class PromptProviderMicrophone(PromptProvider):
                     print(f"Error stopping recording: {e}")
 
 
-class PromptProviderDatabase(PromptProvider):
-    """
-    A prompt provider that gets prompts from a database.
-    This is just an example implementation.
-    """
-
-    def __init__(self, database_url: str, init_prompt: str = "Image of a cat"):
-        super().__init__(init_prompt)
-        self._database_url = database_url
-        # Add any database connection initialization here
-
-    def get_current_prompt(self) -> str | bool:
-        """
-        Get the current prompt from the database if available.
-
-        Returns:
-            str: The next prompt from the database if one exists
-            bool: False if no new prompts are available
-        """
-        # Add actual database query logic here
-        # This is just a placeholder
-        return self._current_prompt
-
-
-class PromptProviderMicrophoneTxt(PromptProviderMicrophone):
+class PromptProviderTxtFile(PromptProvider):
     """
     A prompt provider that gets prompts from a text file.
     This is just an example implementation.
