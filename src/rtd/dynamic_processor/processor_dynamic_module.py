@@ -132,8 +132,9 @@ class DynamicProcessor:
         # Execute the block (this will run tests, make changes, etc.)
         executor.execute_block()
 
-    def update_protoblock(self):
-        task_user = "let us just use the human segmentation mask and fill it with noise"
+    def update_protoblock(self, task_user=None):
+        if task_user is None:
+            task_user = "let us just use the human segmentation mask and fill it with noise"
         task_description = task_user + "\n" + self.task_static
 
         self.generate_protoblock(task_description)

@@ -58,9 +58,12 @@ class PromptProviderMicrophone(PromptProvider):
     This is just an example implementation.
     """
 
-    def __init__(self, init_prompt: str = "Image of a cat"):
+    def __init__(self, init_prompt: str = "Image of a cat", speech_detector=None):
         super().__init__(init_prompt)
-        self.speech_detector = lt.Speech2Text()
+        if speech_detector is None:
+            self.speech_detector = lt.Speech2Text()
+        else:
+            self.speech_detector = speech_detector
         # Add any microphone initialization here
 
     def get_current_prompt(self) -> str | bool:

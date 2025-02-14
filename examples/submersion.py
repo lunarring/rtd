@@ -22,13 +22,12 @@ if __name__ == "__main__":
     do_compile = False
     do_diffusion = True
     do_fullscreen = True
-    do_dynamic_processor = True
+    
     device = "cuda:0"
     img_diffusion = None
 
-    if do_dynamic_processor:
-        assert not do_compile
-        dynamic_processor = DynamicProcessor()
+    dynamic_processor = DynamicProcessor()
+
     if do_diffusion:
         device = "cuda:0"
     else:
@@ -65,7 +64,7 @@ if __name__ == "__main__":
         width_diffusion=width_diffusion,
         device=device,
     )
-
+    speech_detector = lt.Speech2Text()
     prompt_provider = PromptProviderMicrophone()
 
     # Initialize FPS tracking
@@ -73,15 +72,14 @@ if __name__ == "__main__":
 
     # Frame interpolator for smooth transitions
     # frame_interpolator = AverageFrameInterpolator(num_frames=n_frame_interpolations)
-
     while True:
         t_processing_start = time.time()
 
         dyn_prompt_mic_unmuter = akai_lpd8.get("A0", button_mode="held_down")
         new_prompt_mic_unmuter = akai_lpd8.get("A1", button_mode="held_down")
+        do_dynamic_processor = akai_lpd8.get("B0", button_mode="toggle", val_default=True)
         do_human_seg = akai_lpd8.get("B1", button_mode="toggle", val_default=True)
         cycle_prompt = akai_lpd8.get("C0", button_mode="pressed_once")
-        do_acid_tracers = akai_lpd8.get("B1", button_mode="toggle", val_default=True)
         do_acid_wobblers = akai_lpd8.get("C1", button_mode="toggle", val_default=False)
         do_debug_seethrough = akai_lpd8.get("D1", button_mode="toggle", val_default=False)
         acid_strength = akai_lpd8.get("E0", val_min=0, val_max=1.0, val_default=0.11)
@@ -93,12 +91,15 @@ if __name__ == "__main__":
         color_matching = akai_lpd8.get("G0", val_min=0, val_max=1, val_default=0.5)
         dynamic_func_coef = akai_lpd8.get("G1", val_min=0, val_max=1, val_default=0.5)
         do_blur = True
+        do_acid_tracers = True
 
+        if do_dynamic_processor:
+            assert not do_compile
 
-        new_prompt_available = prompt_provider.handle_unmute_button(new_prompt_mic_unmuter)
+        new_diffusion_prompt_available = prompt_provider.handle_unmute_button(new_prompt_mic_unmuter)
         # prompt_provider.handle_prompt_cycling_button(cycle_prompt)
 
-        if new_prompt_available:
+        if new_diffusion_prompt_available:
             current_prompt = prompt_provider.get_current_prompt()
             print(f"New prompt: {current_prompt}")
             if do_diffusion:
@@ -112,8 +113,10 @@ if __name__ == "__main__":
         input_image_processor.set_blur(do_blur)
         img_proc, human_seg_mask = input_image_processor.process(img_cam)
 
-        if inject_dyn_prompt:
-            dynamic_processor.update_protoblock_voice()
+        new_dynamic_prompt_available = speech_detector.handle_unmute_button(dyn_prompt_mic_unmuter)
+
+        if new_dynamic_prompt_available:
+            dynamic_processor.update_protoblock(speech_detector.transcript)
         if do_dynamic_processor and img_diffusion is not None:
             img_acid = dynamic_processor.process(
                 img_cam.astype(np.float32),
