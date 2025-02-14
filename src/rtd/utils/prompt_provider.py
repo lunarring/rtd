@@ -71,7 +71,7 @@ class PromptProviderMicrophone(PromptProvider):
             str: The current prompt
             bool: False if no prompt is available
         """
-        return self._current_prompt
+        return self.speech_detector.transcript
 
     def start_recording(self):
         self.speech_detector.start_recording()
@@ -81,18 +81,8 @@ class PromptProviderMicrophone(PromptProvider):
         if new_prompt:
             self._current_prompt = new_prompt
 
-    def handle_mic_button(self, mic_button_state: bool):
-        if mic_button_state:
-            if not self.speech_detector.audio_recorder.is_recording:
-                self.start_recording()
-        else:
-            if self.speech_detector.audio_recorder.is_recording:
-                try:
-                    prompt_new = self.speech_detector.stop_recording()
-                    prompt_new = prompt_new.strip().lower()
-                    self._current_prompt = prompt_new
-                except Exception as e:
-                    print(f"Error stopping recording: {e}")
+    def handle_unmute_button(self, mic_button_state: bool):
+        return self.speech_detector.handle_unmute_button(mic_button_state)
 
 
 class PromptProviderTxtFile(PromptProvider):

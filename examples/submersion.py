@@ -77,11 +77,10 @@ if __name__ == "__main__":
     while True:
         t_processing_start = time.time()
 
-        do_human_seg = akai_lpd8.get("A0", button_mode="toggle", val_default=True)
-        mic_button_state = akai_lpd8.get("A1", button_mode="held_down")
+        dyn_prompt_mic_unmuter = akai_lpd8.get("A0", button_mode="held_down")
+        new_prompt_mic_unmuter = akai_lpd8.get("A1", button_mode="held_down")
+        do_human_seg = akai_lpd8.get("B1", button_mode="toggle", val_default=True)
         cycle_prompt = akai_lpd8.get("C0", button_mode="pressed_once")
-        do_blur = True
-        inject_dyn_prompt = akai_lpd8.get("B0", button_mode="pressed_once")
         do_acid_tracers = akai_lpd8.get("B1", button_mode="toggle", val_default=True)
         do_acid_wobblers = akai_lpd8.get("C1", button_mode="toggle", val_default=False)
         do_debug_seethrough = akai_lpd8.get("D1", button_mode="toggle", val_default=False)
@@ -92,13 +91,14 @@ if __name__ == "__main__":
         x_shift = int(akai_lpd8.get("H0", val_min=-50, val_max=50, val_default=0))
         y_shift = int(akai_lpd8.get("H1", val_min=-50, val_max=50, val_default=0))
         color_matching = akai_lpd8.get("G0", val_min=0, val_max=1, val_default=0.5)
-
         dynamic_func_coef = akai_lpd8.get("G1", val_min=0, val_max=1, val_default=0.5)
+        do_blur = True
 
-        prompt_provider.handle_mic_button(mic_button_state)
+
+        new_prompt_available = prompt_provider.handle_unmute_button(new_prompt_mic_unmuter)
         # prompt_provider.handle_prompt_cycling_button(cycle_prompt)
 
-        if prompt_provider.new_prompt_available():
+        if new_prompt_available:
             current_prompt = prompt_provider.get_current_prompt()
             print(f"New prompt: {current_prompt}")
             if do_diffusion:
