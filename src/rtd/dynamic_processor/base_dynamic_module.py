@@ -20,11 +20,10 @@ class BaseDynamicClass(ABC):
         Process the input images with the given dynamic function coefficient.
 
         Args:
-            img_camera (np.ndarray): Input camera image as float32 numpy array
-            img_mask_segmentation (np.ndarray): Human segmentation mask as float32
-                numpy array
-            img_diffusion (np.ndarray): Diffusion image as float32 numpy array
-            dynamic_func_coef (float): Dynamic function coefficient
+            img_camera (np.ndarray): Input camera image. Range is [0, 255].
+            img_mask_segmentation (np.ndarray): Human segmentation mask. Range is [0, 1].
+            img_diffusion (np.ndarray): Diffusion image. Range is [0, 255].
+            dynamic_func_coef (float): Dynamic function coefficient. Range is [0, 1].
 
         Returns:
             np.ndarray: Processed image as float32 numpy array
