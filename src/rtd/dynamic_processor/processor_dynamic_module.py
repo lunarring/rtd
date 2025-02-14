@@ -12,10 +12,10 @@ from tac.cli.voice import VoiceUI
 
 
 class DynamicProcessor:
-    def __init__(self, base_dir=None):
+    def __init__(self):
         self.module_hash = None
         # Use default base_dir if none provided
-        self.base_dir = "."
+        # self.base_dir = "."
 
         self.fn_func = "dynamic_module.py"
         self.fn_test = "test_dynamic_module.py"
@@ -35,6 +35,7 @@ class DynamicProcessor:
         self.protoblock = None
         self.dynamic_module = None
         self.dynamic_processor = None
+        self.remove_existing_file = False
 
         self.task_static = f"Write a class that derives from {self.fn_base_class} and name the class DynamicClass. Critically it has to pass the existing test in {self.fn_test}. You don't need to implement any further tests."
 
@@ -122,8 +123,9 @@ class DynamicProcessor:
         config_override["general"] = {"plausibility_test": False, "test_path": "src/rtd/dynamic_processor/tests/test_dynamic_module.py"}
 
         # Remove the function file if it exists
-        if os.path.exists(self.fp_func):
-            os.remove(self.fp_func)
+        if self.remove_existing_file:
+            if os.path.exists(self.fp_func):
+                os.remove(self.fp_func)
 
         # Create executor with the protoblock and config override
         executor = ProtoBlockExecutor(protoblock=self.protoblock, config_override=config_override, codebase="")
