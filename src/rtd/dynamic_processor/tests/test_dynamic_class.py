@@ -53,8 +53,8 @@ class TestDynamicModuleTests(unittest.TestCase):
         img_mask = np.zeros(self.shape, dtype=np.float32)
         img_mask[:512, :, :] = 1.0
         result = self.processor.process(img_camera, img_mask, self.img_diffusion, 1.0)
-        # Check that the bottom half is all zeros
-        self.assertTrue(np.all(result[512:, :, :] == 0), "Bottom half of result should be zero due to mask.")
+        # Check that the bottom half is not all zeros due to circles overlay
+        self.assertFalse(np.all(result[512:, :, :] == 0), "Bottom half of result should not be zero due to circles overlay.")
         # Check that the top half is not all zero
         self.assertFalse(np.all(result[:512, :, :] == 0), "Top half of result should not be zero.")
 
@@ -67,6 +67,20 @@ class TestDynamicModuleTests(unittest.TestCase):
         # Check that all values are within [0, 255]
         self.assertTrue(np.all(result >= 0), "Output contains values less than 0")
         self.assertTrue(np.all(result <= 255), "Output contains values greater than 255")
+    
+    def test_circle_colors(self):
+        """Test that each circle has a valid color attribute."""
+        # Trigger initialization by calling process
+        self.processor.process(self.img_camera, self.img_mask, self.img_diffusion, self.dynamic_coef)
+        self.assertTrue(self.processor.initialized, "Processor should be initialized after process call.")
+        for group in self.processor.circles:
+            for circle in group:
+                self.assertIn('color', circle, "Circle does not have a 'color' attribute.")
+                color = circle['color']
+                self.assertEqual(len(color), 3, "Color attribute should be a tuple of 3 elements.")
+                for channel in color:
+                    self.assertGreaterEqual(channel, 0, "Color channel should be >= 0")
+                    self.assertLessEqual(channel, 255, "Color channel should be <= 255")
 
 
 if __name__ == "__main__":
