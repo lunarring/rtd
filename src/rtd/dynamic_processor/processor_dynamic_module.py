@@ -18,7 +18,7 @@ class DynamicProcessor:
         # self.base_dir = "."
 
         self.fn_func = "dynamic_module.py"
-        self.fn_test = "test_dynamic_module.py"
+        self.fn_test = "test_dynamic_class.py"
         self.fn_base_class = "base_dynamic_module.py"
 
         # Use importlib.resources to get package paths
@@ -120,7 +120,7 @@ class DynamicProcessor:
         # Create config override dictionary to disable git and plausibility check
         config_override = {}
         config_override["git"] = {"enabled": False}
-        config_override["general"] = {"plausibility_test": False, "test_path": "src/rtd/dynamic_processor/tests/test_dynamic_module.py"}
+        config_override["general"] = {"plausibility_test": False, "test_path": self.fp_test}
 
         # Remove the function file if it exists
         if self.remove_existing_file:
