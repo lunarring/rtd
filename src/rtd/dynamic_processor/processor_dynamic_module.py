@@ -9,6 +9,9 @@ from tac.protoblock.factory import ProtoBlockFactory
 from tac.core.executor import ProtoBlockExecutor
 import rtd.dynamic_processor
 from tac.cli.voice import VoiceUI
+import datetime
+import shutil
+import os
 
 
 class DynamicProcessor:
@@ -74,10 +77,6 @@ class DynamicProcessor:
 
     def _backup_dynamic_class(self):
         """Create a backup of the current dynamic class file with timestamp."""
-        import datetime
-        import shutil
-        import os
-
         # Create backup directory if it doesn't exist
         with importlib.resources.path("rtd.dynamic_processor", "") as p:
             backup_dir = os.path.join(str(p), "backup")
