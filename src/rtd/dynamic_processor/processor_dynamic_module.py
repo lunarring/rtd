@@ -17,17 +17,26 @@ class DynamicProcessor:
         # Use default base_dir if none provided
         self.base_dir = "."
 
+        self.fn_func = "dynamic_module.py"
+        self.fn_test = "test_dynamic_module.py"
+        self.fn_base_class = "base_dynamic_module.py"
+
         # Use importlib.resources to get package paths
-        with importlib.resources.path("rtd.dynamic_processor", "dynamic_module.py") as p:
+        with importlib.resources.path("rtd.dynamic_processor", self.fn_func) as p:
             self.fp_func = str(p)
-        with importlib.resources.path("rtd.dynamic_processor.tests", "test_dynamic_module.py") as p:
+        with importlib.resources.path("rtd.dynamic_processor.tests", self.fn_test) as p:
             self.fp_test = str(p)
         with importlib.resources.path("rtd.dynamic_processor", "dynamic_module.json") as p:
             self.fp_proto = str(p)
+        with importlib.resources.path("rtd.dynamic_processor", self.fn_base_class) as p:
+            self.fp_base_class = str(p)
 
         self.factory = ProtoBlockFactory()
         self.protoblock = None
         self.dynamic_module = None
+        self.dynamic_processor = None
+
+        self.task_static = f"Write a class that derives from {self.fn_base_class} and name the class DynamicClass. Critically it has to pass the existing test in {self.fn_test}. You don't need to implement any further tests."
 
     def process(self, img_camera, img_mask_segmentation, img_diffusion, dynamic_func_coef=0.5):
         if not os.path.exists(self.fp_func):
@@ -48,9 +57,11 @@ class DynamicProcessor:
             spec = importlib.util.spec_from_file_location("dynamic_module", self.fp_func)
             self.dynamic_module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(self.dynamic_module)
+            self.dynamic_processor = self.dynamic_module.DynamicClass()
             self.module_hash = current_hash
-        if self.dynamic_module:
-            x = self.dynamic_module.process(img_camera, img_mask_segmentation, img_diffusion, dynamic_func_coef=dynamic_func_coef)
+            self._backup_dynamic_class()  # Create backup when module changes
+        if self.dynamic_module and self.dynamic_processor:
+            x = self.dynamic_processor.process(img_camera, img_mask_segmentation, img_diffusion, dynamic_func_coef=dynamic_func_coef)
             return np.flip(x, axis=1)
         else:
             return img_camera
@@ -59,6 +70,25 @@ class DynamicProcessor:
         """Compute SHA-256 hash of file contents"""
         with open(file_path, "rb") as f:
             return hashlib.sha256(f.read()).hexdigest()
+
+    def _backup_dynamic_class(self):
+        """Create a backup of the current dynamic class file with timestamp."""
+        import datetime
+        import shutil
+        import os
+
+        # Create backup directory if it doesn't exist
+        with importlib.resources.path("rtd.dynamic_processor", "") as p:
+            backup_dir = os.path.join(str(p), "backup")
+        os.makedirs(backup_dir, exist_ok=True)
+
+        # Generate timestamp
+        timestamp = datetime.datetime.now().strftime("%y%m%d_%H%M")
+        backup_filename = f"backup_dynamic_class_{timestamp}.py"
+        backup_path = os.path.join(backup_dir, backup_filename)
+
+        # Copy the file
+        shutil.copy2(self.fp_func, backup_path)
 
     def generate_protoblock(self, task_description):
         # Delete existing protoblock file if it exists
@@ -69,7 +99,7 @@ class DynamicProcessor:
         test_specification = ""
         test_data_generation = ""
         write_files = [self.fp_func]
-        context_files = [self.fp_test]
+        context_files = [self.fp_test, self.fp_base_class]
         commit_message = "None"
         test_results = None
 
@@ -103,8 +133,7 @@ class DynamicProcessor:
 
     def update_protoblock(self):
         task_user = "let us just use the human segmentation mask and fill it with noise"
-        task_static = "the input of the function are three numpy arrays that are images: img_camera, img_mask_segmentation, img_diffusion, which are all float32. also we get a float parameter [0,1] called dynamic_func_coef.we need one numpy array as output. it has to pass the existing test. make sure the function name is called 'process'."
-        task_description = task_user + "\n" + task_static
+        task_description = task_user + "\n" + self.task_static
 
         self.generate_protoblock(task_description)
         self.execute_protoblock()
@@ -121,8 +150,7 @@ class DynamicProcessor:
         # Inject confirmation message
         voice_ui.inject_message("I understand your request. I will now start programming according to your instructions.")
 
-        task_static = "the input of the function are three numpy arrays that are images and one float parameter: img_camera, img_mask_segmentation, img_diffusion, dynamic_func_coef, which are all float32. we need one numpy array as output. it has to pass the existing test. make sure the function name is called 'process'."
-        task_description = task_user + "\n" + task_static
+        task_description = task_user + "\n" + self.task_static
 
         self.generate_protoblock(task_description)
         self.execute_protoblock()

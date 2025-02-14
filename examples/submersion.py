@@ -1,7 +1,7 @@
 from rtd.sdxl_turbo.diffusion_engine import DiffusionEngine
 from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
 import lunar_tools as lt
-from rtd.dynamic_processor.dynamic_processor import DynamicProcessor
+from rtd.dynamic_processor.processor_dynamic_module import DynamicProcessor
 from rtd.utils.input_image import InputImageProcessor, AcidProcessor
 from rtd.utils.prompt_provider import (
     PromptProviderMicrophone,
