@@ -115,8 +115,13 @@ if __name__ == "__main__":
         if inject_dyn_prompt:
             dynamic_processor.update_protoblock_voice()
         if do_dynamic_processor and img_diffusion is not None:
-            img_acid = dynamic_processor.process(img_cam, human_seg_mask, img_diffusion, dynamic_func_coef=dynamic_func_coef)
-            img_proc = img_acid
+            img_acid = dynamic_processor.process(
+                img_cam.astype(np.float32),
+                human_seg_mask.astype(np.float32) / 255,
+                np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
+                dynamic_func_coef=dynamic_func_coef,
+            )
+            img_proc = np.clip(img_acid, 0, 255).astype(np.uint8)
         else:
             # Acid
             acid_processor.set_acid_strength(acid_strength)

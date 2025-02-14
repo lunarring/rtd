@@ -11,9 +11,9 @@ class BaseDynamicClass(ABC):
     @abstractmethod
     def process(
         self,
-        img_camera: NDArray[np.uint8],
-        img_mask_segmentation: NDArray[np.uint8],
-        img_diffusion: NDArray[np.uint8],
+        img_camera: NDArray[np.float32],
+        img_mask_segmentation: NDArray[np.float32],
+        img_diffusion: NDArray[np.float32],
         dynamic_func_coef: float,
     ) -> NDArray[np.float32]:
         """
