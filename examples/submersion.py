@@ -8,6 +8,7 @@ from rtd.utils.prompt_provider import (
     PromptProviderMicrophoneTxt,
 )
 import time
+import numpy as np
 from rtd.utils.frame_interpolation import AverageFrameInterpolator
 
 
@@ -136,7 +137,7 @@ if __name__ == "__main__":
         de_img.set_strength(1 / de_img.num_inference_steps + 0.00001)
 
         fps_tracker.start_segment("Diffusion")
-        img_diffusion = de_img.generate()
+        img_diffusion = np.array(de_img.generate())
 
         acid_processor.update(img_diffusion)
 

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
+from numpy.typing import NDArray
 
 
 class BaseDynamicClass(ABC):
@@ -10,11 +11,11 @@ class BaseDynamicClass(ABC):
     @abstractmethod
     def process(
         self,
-        img_camera: np.ndarray,
-        img_mask_segmentation: np.ndarray,
-        img_diffusion: np.ndarray,
+        img_camera: NDArray[np.uint8],
+        img_mask_segmentation: NDArray[np.uint8],
+        img_diffusion: NDArray[np.uint8],
         dynamic_func_coef: float,
-    ) -> np.ndarray:
+    ) -> NDArray[np.float32]:
         """
         Process the input images with the given dynamic function coefficient.
 
