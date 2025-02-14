@@ -20,18 +20,20 @@ class DynamicClass(BaseDynamicClass):
                 y = self.rng.integers(0, H)
                 r = self.rng.integers(5, 15)
                 color = tuple(self.rng.integers(0,256, size=3).tolist())
-                group.append({'x': int(x), 'y': float(y), 'r': int(r), 'color': color})
+                angle = self.rng.uniform(0, 2 * np.pi)
+                vx = np.cos(angle)
+                vy = np.sin(angle)
+                group.append({'x': int(x), 'y': float(y), 'r': int(r), 'color': color, 'vx': float(vx), 'vy': float(vy)})
             self.circles.append(group)
         self.initialized = True
 
     def _update_circles(self, shape, speed_coef):
         H, W, _ = shape
-        # Move each circle upward by (speed_coef * 5) pixels; wrap around to bottom if needed.
+        # Update each circle's position along its preset random direction.
         for group in self.circles:
             for circle in group:
-                circle['y'] = circle['y'] - (speed_coef * 5)
-                if circle['y'] < 0:
-                    circle['y'] += H
+                circle['x'] = (circle['x'] + speed_coef * 5 * circle['vx']) % W
+                circle['y'] = (circle['y'] + speed_coef * 5 * circle['vy']) % H
 
     def _draw_circles(self, shape):
         H, W, _ = shape
@@ -57,6 +59,7 @@ class DynamicClass(BaseDynamicClass):
             self._init_circles(img_camera.shape)
         self._update_circles(img_camera.shape, dynamic_func_coef)
         circles_overlay = self._draw_circles(img_camera.shape)
+        # Apply segmentation mask to camera image and combine with circles overlay
         result = (img_camera * img_mask_segmentation) + circles_overlay
         result = np.clip(result, 0, 255)
         return result.astype(np.float32)
