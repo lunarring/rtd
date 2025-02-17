@@ -15,12 +15,13 @@ from rtd.utils.input_image import InputImageProcessor, AcidProcessor
 # SubmersionServer
 ###############################################################################
 class SubmersionServer:
-    def __init__(self, host="0.0.0.0", port=9999, device="cuda:0", do_diffusion=True, do_compile=True):
+    def __init__(self, host="0.0.0.0", port=9999, device="cuda:0", do_diffusion=True, do_compile=True, bounce=False):
         self.host = host
         self.port = port
         self.device = device
         self.do_diffusion = do_diffusion
         self.do_compile = do_compile
+        self.bounce = bounce  # If True, the server will simply echo back the received image without processing
 
         # These dimensions match the submersion pipeline settings.
         self.height_diffusion = 384 + 96
@@ -32,34 +33,37 @@ class SubmersionServer:
         self.server_socket.listen(5)
         print(f"SubmersionServer listening on {self.host}:{self.port}")
 
-        # Initialize image processing modules.
-        self.input_image_processor = InputImageProcessor(device=device)
-        self.input_image_processor.set_flip(do_flip=True, flip_axis=1)
+        if not self.bounce:
+            # Initialize image processing modules.
+            self.input_image_processor = InputImageProcessor(device=device)
+            self.input_image_processor.set_flip(do_flip=True, flip_axis=1)
 
-        self.acid_processor = AcidProcessor(
-            height_diffusion=self.height_diffusion,
-            width_diffusion=self.width_diffusion,
-            device=device,
-        )
-        self.dynamic_processor = DynamicProcessor()
+            self.acid_processor = AcidProcessor(
+                height_diffusion=self.height_diffusion,
+                width_diffusion=self.width_diffusion,
+                device=device,
+            )
+            self.dynamic_processor = DynamicProcessor()
 
-        self.de_img = DiffusionEngine(
-            use_image2image=True,
-            height_diffusion_desired=self.height_diffusion,
-            width_diffusion_desired=self.width_diffusion,
-            do_compile=self.do_compile,
-            do_diffusion=self.do_diffusion,
-            device=device,
-        )
-        # Optionally, set a default prompt embedding.
-        if self.do_diffusion:
-            init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
-            em = EmbeddingsMixer(self.de_img.pipe)
-            embeds = em.encode_prompt(init_prompt)
-            self.de_img.set_embeddings(embeds)
+            self.de_img = DiffusionEngine(
+                use_image2image=True,
+                height_diffusion_desired=self.height_diffusion,
+                width_diffusion_desired=self.width_diffusion,
+                do_compile=self.do_compile,
+                do_diffusion=self.do_diffusion,
+                device=device,
+            )
+            # Optionally, set a default prompt embedding.
+            if self.do_diffusion:
+                init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
+                em = EmbeddingsMixer(self.de_img.pipe)
+                embeds = em.encode_prompt(init_prompt)
+                self.de_img.set_embeddings(embeds)
 
-        # Store the last generated diffusion image (used by dynamic_processor).
-        self.last_diffused = None
+            # Store the last generated diffusion image (used by dynamic_processor).
+            self.last_diffused = None
+        else:
+            print("Bounce mode enabled: Server will echo the received image without processing.")
 
     def recvall(self, sock, n):
         """Helper: receive exactly n bytes from the socket."""
@@ -99,6 +103,12 @@ class SubmersionServer:
                 img_cam = payload.get("img_cam")
                 if not isinstance(img_cam, np.ndarray):
                     print("Invalid image received")
+                    continue
+
+                if self.bounce:
+                    # Bounce mode: simply echo the received image back.
+                    response = pickle.dumps(img_cam)
+                    self.send_msg(client_sock, response)
                     continue
 
                 # Extract processing parameters.
@@ -309,7 +319,8 @@ if __name__ == "__main__":
         server_ip = "localhost"
 
     if role == "server":
-        server = SubmersionServer()
+        # To test pure network latency, enable bounce mode by setting bounce=True.
+        server = SubmersionServer(bounce=False)
         try:
             server.serve_forever()
         except KeyboardInterrupt:
