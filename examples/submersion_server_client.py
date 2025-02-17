@@ -4,12 +4,16 @@ import struct
 import time
 import numpy as np
 import sys
-
-from rtd.sdxl_turbo.diffusion_engine import DiffusionEngine
-from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
 import lunar_tools as lt
-from rtd.dynamic_processor.processor_dynamic_module import DynamicProcessor
+
+if len(sys.argv) > 1 and sys.argv[1].lower() == "server":
+    from rtd.sdxl_turbo.diffusion_engine import DiffusionEngine
+    from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
+    from rtd.dynamic_processor.processor_dynamic_module import DynamicProcessor
+    from rtd.utils.input_image import InputImageProcessor, AcidProcessor
+
 from rtd.utils.input_image import InputImageProcessor, AcidProcessor
+from rtd.utils.compression_helpers import send_compressed, recv_compressed
 
 ###############################################################################
 # SubmersionServer
@@ -99,19 +103,21 @@ class SubmersionServer:
                     print("Client disconnected")
                     break
 
-                # Unpickle the received payload.
+                # Unpickle the received payload (contains processing parameters).
                 payload = pickle.loads(data)
-                # Extract the raw camera image.
-                img_cam = payload.get("img_cam")
-                if not isinstance(img_cam, np.ndarray):
-                    print("Invalid image received")
-                    continue
 
                 if self.bounce:
-                    # Bounce mode: simply echo the received image back.
-                    # Note: Serializing large numpy arrays via pickle can be a significant overhead.
-                    response = pickle.dumps(img_cam, protocol=pickle.HIGHEST_PROTOCOL)
-                    self.send_msg(client_sock, response)
+                    # In bounce mode, receive the compressed image and echo it back.
+                    img = recv_compressed(client_sock)
+                    if img is None:
+                        break
+                    send_compressed(client_sock, img, quality=90)
+                    continue
+
+                # Receive the compressed camera image.
+                img_cam = recv_compressed(client_sock)
+                if img_cam is None or not isinstance(img_cam, np.ndarray):
+                    print("Invalid image received")
                     continue
 
                 # Extract processing parameters.
@@ -166,9 +172,8 @@ class SubmersionServer:
                 self.acid_processor.update(img_diffusion)
                 self.last_diffused = img_diffusion
 
-                # Send the diffused image back to the client.
-                response = pickle.dumps(img_diffusion, protocol=pickle.HIGHEST_PROTOCOL)
-                self.send_msg(client_sock, response)
+                # Send the diffused image back to the client using compression.
+                send_compressed(client_sock, img_diffusion, quality=90)
 
             except Exception as e:
                 print("Error handling client:", e)
@@ -236,7 +241,7 @@ class SubmersionClient:
             return None
         msglen = struct.unpack('!I', raw_msglen)[0]
         return self.recvall(sock, msglen)
-
+    
     def run(self):
         while True:
             t_processing_start = time.time()
@@ -269,9 +274,8 @@ class SubmersionClient:
             # Acquire the camera image.
             img_cam = self.cam.get_img()
 
-            # Prepare the payload to send to the server.
+            # Prepare the payload with processing parameters (exclude raw image).
             payload = {
-                "img_cam": img_cam,
                 "do_human_seg": do_human_seg,
                 "acid_strength": acid_strength,
                 "acid_strength_foreground": acid_strength_foreground,
@@ -287,26 +291,22 @@ class SubmersionClient:
             }
 
             try:
-                # Use highest protocol for faster serialization.
+                # Use highest protocol for faster serialization for parameters.
                 data = pickle.dumps(payload, protocol=pickle.HIGHEST_PROTOCOL)
                 self.send_msg(self.sock, data)
+                # Send the camera image using compression.
+                send_compressed(self.sock, img_cam, quality=90)
 
-                # Wait for the processed diffusion image.
-                response_data = self.recv_msg(self.sock)
-                if response_data is None:
+                # Wait for the processed diffusion image (received in compressed form).
+                img_diffusion = recv_compressed(self.sock)
+                if img_diffusion is None:
                     print("Disconnected from server")
                     break
-
-                img_diffusion = pickle.loads(response_data)
 
                 # Render the received image.
                 self.renderer.render(img_diffusion)
 
                 t_processing = time.time() - t_processing_start
-                # Note: The reported frame processing time (e.g. ~0.19 secs) includes the overhead
-                # of serializing/deserializing large numpy arrays and network delays.
-                # To improve throughput, consider using more efficient serialization (or compression)
-                # and ensure options like TCP_NODELAY are enabled.
                 print(f"Frame processed in {t_processing:.2f} secs")
             except Exception as e:
                 print("Error during communication with server:", e)
@@ -338,36 +338,5 @@ if __name__ == "__main__":
     elif role == "client":
         client = SubmersionClient(server_host=server_ip)
         client.run()
-        # For this simple example, send a single dummy payload to the server.
-        # Create a dummy image (black image) matching the expected camera dimensions.
-        # dummy_image = np.zeros((576, 1024, 3), dtype=np.uint8)
-        # payload = {
-        #     "img_cam": dummy_image,
-        #     "do_human_seg": True,
-        #     "acid_strength": 0.11,
-        #     "acid_strength_foreground": 0.11,
-        #     "coef_noise": 0.15,
-        #     "zoom_factor": 1.0,
-        #     "x_shift": 0,
-        #     "y_shift": 0,
-        #     "color_matching": 0.5,
-        #     "dynamic_func_coef": 0.5,
-        #     "do_dynamic_processor": False,
-        #     "do_blur": True,
-        #     "do_acid_tracers": True,
-        # }
-        # try:
-        #     data = pickle.dumps(payload)
-        #     client.send_msg(client.sock, data)
-        #     response = client.recv_msg(client.sock)
-        #     if response:
-        #         result_img = pickle.loads(response)
-        #         print("Received response from server. Result image shape:", result_img.shape)
-        #     else:
-        #         print("No response from server.")
-        # except Exception as e:
-        #     print("Error during client communication:", e)
-        # finally:
-        #     client.sock.close()
     else:
         print("Invalid mode. Use 'server' or 'client'.")
