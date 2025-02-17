@@ -36,7 +36,7 @@ if __name__ == "__main__":
     init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
     # init_prompt = "Normal naked people"
 
-    akai_lpd8 = lt.MidiInput(device_name="akai_lpd8")
+    meta_input = lt.MetaInput()
     de_img = DiffusionEngine(
         use_image2image=True,
         height_diffusion_desired=height_diffusion,
@@ -70,26 +70,57 @@ if __name__ == "__main__":
     # Initialize FPS tracking
     fps_tracker = lt.FPSTracker()
 
+    #  Reference
+    # noise_mixing = meta_input.get(akai_midimix="D0", val_min=0, val_max=1.0, val_default=0)
+    # do_cam_coloring = meta_input.get(akai_midimix="G3", button_mode="toggle")
+    # do_gray_noise = meta_input.get(akai_midimix="G4", button_mode="toggle")
+    # do_record_mic = meta_input.get(akai_midimix="A3", akai_lpd8="A1", button_mode="held_down")
+    # do_tracers = meta_input.get(akai_midimix="E4", button_mode="toggle")
+    # do_memory_tracers = not meta_input.get(akai_midimix='F3', button_mode='toggle')
+    # get_new_prompt = meta_input.get(akai_midimix='B3', akai_lpd8='A0', button_mode='pressed_once')
+    # save_prompt = meta_input.get(akai_midimix='B4', akai_lpd8='C1', button_mode='pressed_once')
+    # get_new_prompt_decoder = meta_input.get(akai_midimix='C3', akai_lpd8='A0', button_mode='pressed_once')
+    # use_image2image = meta_input.get(akai_midimix="I2", button_mode="toggle")
+    # do_colorize = meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
+    # apply_body_mask = meta_input.get(akai_midimix="E3", button_mode="toggle", val_default=1)
+    # brightness_gain = meta_input.get(akai_midimix="A2", val_min=1, val_max=10, val_default=1)
+    # do_prompt_from_image = meta_input.get(akai_midimix="F4", button_mode="toggle")
+    # num_inference_steps = meta_input.get(akai_midimix="D1", val_min=2, val_max=10, val_default=2)
+    # mod_samp = meta_input.get(akai_midimix="H2", val_min=0, val_max=10, val_default=0)
+    # mod_emb = meta_input.get(akai_midimix="H1", akai_lpd8="F1", val_min=1, val_max=10, val_default=2)
+    # fract_mod = meta_input.get(akai_midimix="G0", val_default=0, val_max=2, val_min=0)
+    # use_debug_overlay = meta_input.get(akai_midimix="H3", akai_lpd8="D1", button_mode="toggle")
+    # rotation_angle = meta_input.get(akai_midimix="B2", val_min=0, val_max=90, val_default=0)
+    # do_accumulate_acid = meta_input.get(akai_midimix="C4", akai_lpd8="B0", button_mode="toggle")
+    # do_local_accumulate_acid = meta_input.get(akai_midimix="D4", button_mode="toggle")
+    # invert_accumulate_acid = meta_input.get(akai_midimix="D3", akai_lpd8="B1", button_mode="toggle")
+    # acid_gain = meta_input.get(akai_midimix="C0", akai_lpd8="F0", val_min=0, val_max=0.5, val_default=0.05)
+    # acid_strength_foreground = meta_input.get(akai_midimix="C1", val_min=0, val_max=1, val_default=0.05)
+    # acid_freq = meta_input.get(akai_midimix="F2", val_min=0, val_max=10.0, val_default=0)
+    # zoom_factor = meta_input.get(akai_midimix="F0", akai_lpd8="G0", val_min=0.9, val_max=1.1, val_default=1.01)
+    # do_record_movie = meta_input.get(akai_midimix="I1", button_mode="toggle")
+    # d_fract_embed = meta_input.get(akai_midimix="A1", akai_lpd8="E0", val_min=0.0005, val_max=0.05, val_default=0.05)
+
     # Frame interpolator for smooth transitions
     # frame_interpolator = AverageFrameInterpolator(num_frames=n_frame_interpolations)
     while True:
         t_processing_start = time.time()
 
-        dyn_prompt_mic_unmuter = akai_lpd8.get("A0", button_mode="held_down")
-        new_prompt_mic_unmuter = akai_lpd8.get("A1", button_mode="held_down")
-        do_dynamic_processor = akai_lpd8.get("B0", button_mode="toggle", val_default=True)
-        do_human_seg = akai_lpd8.get("B1", button_mode="toggle", val_default=True)
-        cycle_prompt = akai_lpd8.get("C0", button_mode="pressed_once")
-        do_acid_wobblers = akai_lpd8.get("C1", button_mode="toggle", val_default=False)
-        do_debug_seethrough = akai_lpd8.get("D1", button_mode="toggle", val_default=False)
-        acid_strength = akai_lpd8.get("E0", val_min=0, val_max=1.0, val_default=0.11)
-        acid_strength_foreground = akai_lpd8.get("E1", val_min=0, val_max=1.0, val_default=0.11)
-        coef_noise = akai_lpd8.get("F0", val_min=0, val_max=1.0, val_default=0.15)
-        zoom_factor = akai_lpd8.get("F1", val_min=0.5, val_max=1.5, val_default=1.0)
-        x_shift = int(akai_lpd8.get("H0", val_min=-50, val_max=50, val_default=0))
-        y_shift = int(akai_lpd8.get("H1", val_min=-50, val_max=50, val_default=0))
-        color_matching = akai_lpd8.get("G0", val_min=0, val_max=1, val_default=0.5)
-        dynamic_func_coef = akai_lpd8.get("G1", val_min=0, val_max=1, val_default=0.5)
+        dyn_prompt_mic_unmuter = meta_input.get(akai_lpd8="A0", akai_midimix="A3", button_mode="held_down")
+        new_prompt_mic_unmuter = meta_input.get(akai_lpd8="A1", akai_midimix="B3", button_mode="held_down")
+        do_dynamic_processor = meta_input.get(akai_lpd8="B0", akai_midimix="B4", button_mode="toggle", val_default=False)
+        do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="E3", button_mode="toggle", val_default=True)
+        cycle_prompt = meta_input.get(akai_lpd8="C0", akai_midimix="C3", button_mode="pressed_once")
+        do_acid_wobblers = meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
+        do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
+        acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.11)
+        acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.11)
+        coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=1.0, val_default=0.15)
+        zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="F0", val_min=0.5, val_max=1.5, val_default=1.0)
+        x_shift = int(meta_input.get(akai_lpd8="H0", akai_midimix="H0", val_min=-50, val_max=50, val_default=0))
+        y_shift = int(meta_input.get(akai_lpd8="H1", akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
+        color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="G0", val_min=0, val_max=1, val_default=0.5)
+        dynamic_func_coef = meta_input.get(akai_lpd8="G1", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
         do_blur = True
         do_acid_tracers = True
 
@@ -158,4 +189,4 @@ if __name__ == "__main__":
         renderer.render(img_proc if do_debug_seethrough else img_diffusion)
 
         # Update and display FPS (this will also handle the last segment timing)
-        # fps_tracker.print_fps()
+        fps_tracker.print_fps()
