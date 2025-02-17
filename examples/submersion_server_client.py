@@ -5,6 +5,7 @@ import time
 import numpy as np
 import sys
 import lunar_tools as lt
+from rtd.utils.prompt_provider import PromptProviderMicrophone
 
 if len(sys.argv) > 1 and sys.argv[1].lower() == "server":
     from rtd.sdxl_turbo.diffusion_engine import DiffusionEngine
@@ -105,6 +106,24 @@ class SubmersionServer:
 
                 # Unpickle the received payload (contains processing parameters).
                 payload = pickle.loads(data)
+
+                if not self.bounce:
+                    mic_prompt = payload.get("mic_prompt")
+                    if mic_prompt:
+                        print(f"New microphone prompt received: {mic_prompt}")
+                        if self.do_diffusion:
+                            em = EmbeddingsMixer(self.de_img.pipe)
+                            embeds = em.encode_prompt(mic_prompt)
+                            self.de_img.set_embeddings(embeds)
+
+                    dynamic_transcript = payload.get("dynamic_transcript")
+                    if dynamic_transcript:
+                        print(f"New dynamic transcript received: {dynamic_transcript}")
+                        self.dynamic_processor.update_protoblock(dynamic_transcript)
+
+                    cycle_prompt = payload.get("cycle_prompt")
+                    if cycle_prompt:
+                        print("Cycle prompt signal received.")
 
                 if self.bounce:
                     # In bounce mode, receive the compressed image and echo it back.
@@ -212,6 +231,10 @@ class SubmersionClient:
             do_fullscreen=self.do_fullscreen,
         )
 
+        # Initialize the microphone prompt and speech detection:
+        self.speech_detector = lt.Speech2Text()
+        self.prompt_provider = PromptProviderMicrophone()
+
         # Connect to the server.
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # Disable Nagle's algorithm for lower latency.
@@ -274,6 +297,25 @@ class SubmersionClient:
             # Acquire the camera image.
             img_cam = self.cam.get_img()
 
+            # Acquire microphone/speech-related meta-input signals.
+            dyn_prompt_mic_unmuter = self.meta_input.get(akai_lpd8="A0", akai_midimix="A3", button_mode="held_down")
+            new_prompt_mic_unmuter = self.meta_input.get(akai_lpd8="A1", akai_midimix="B3", button_mode="held_down")
+            cycle_prompt = self.meta_input.get(akai_lpd8="C0", akai_midimix="C3", button_mode="pressed_once")
+
+            # Process microphone inputs.
+            new_diffusion_prompt_available = self.prompt_provider.handle_unmute_button(new_prompt_mic_unmuter)
+            if new_diffusion_prompt_available:
+                mic_prompt = self.prompt_provider.get_current_prompt()
+                print(f"Client new prompt: {mic_prompt}")
+            else:
+                mic_prompt = None
+
+            new_dynamic_prompt_available = self.speech_detector.handle_unmute_button(dyn_prompt_mic_unmuter)
+            if new_dynamic_prompt_available:
+                dynamic_transcript = self.speech_detector.transcript
+            else:
+                dynamic_transcript = None
+
             # Prepare the payload with processing parameters (exclude raw image).
             payload = {
                 "do_human_seg": do_human_seg,
@@ -288,6 +330,9 @@ class SubmersionClient:
                 "do_dynamic_processor": do_dynamic_processor,
                 "do_blur": do_blur,
                 "do_acid_tracers": do_acid_tracers,
+                "cycle_prompt": cycle_prompt,
+                "mic_prompt": mic_prompt,
+                "dynamic_transcript": dynamic_transcript,
             }
 
             try:
