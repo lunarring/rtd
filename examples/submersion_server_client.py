@@ -29,6 +29,8 @@ class SubmersionServer:
 
         # Create and bind the server socket.
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # Disable Nagle's algorithm to reduce latency.
+        self.server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.server_socket.bind((self.host, self.port))
         self.server_socket.listen(5)
         print(f"SubmersionServer listening on {self.host}:{self.port}")
@@ -107,7 +109,8 @@ class SubmersionServer:
 
                 if self.bounce:
                     # Bounce mode: simply echo the received image back.
-                    response = pickle.dumps(img_cam)
+                    # Note: Serializing large numpy arrays via pickle can be a significant overhead.
+                    response = pickle.dumps(img_cam, protocol=pickle.HIGHEST_PROTOCOL)
                     self.send_msg(client_sock, response)
                     continue
 
@@ -164,7 +167,7 @@ class SubmersionServer:
                 self.last_diffused = img_diffusion
 
                 # Send the diffused image back to the client.
-                response = pickle.dumps(img_diffusion)
+                response = pickle.dumps(img_diffusion, protocol=pickle.HIGHEST_PROTOCOL)
                 self.send_msg(client_sock, response)
 
             except Exception as e:
@@ -206,6 +209,8 @@ class SubmersionClient:
 
         # Connect to the server.
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # Disable Nagle's algorithm for lower latency.
+        self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.sock.connect((self.server_host, self.server_port))
         print(f"Connected to server at {self.server_host}:{self.server_port}")
 
@@ -282,7 +287,8 @@ class SubmersionClient:
             }
 
             try:
-                data = pickle.dumps(payload)
+                # Use highest protocol for faster serialization.
+                data = pickle.dumps(payload, protocol=pickle.HIGHEST_PROTOCOL)
                 self.send_msg(self.sock, data)
 
                 # Wait for the processed diffusion image.
@@ -297,6 +303,10 @@ class SubmersionClient:
                 self.renderer.render(img_diffusion)
 
                 t_processing = time.time() - t_processing_start
+                # Note: The reported frame processing time (e.g. ~0.19 secs) includes the overhead
+                # of serializing/deserializing large numpy arrays and network delays.
+                # To improve throughput, consider using more efficient serialization (or compression)
+                # and ensure options like TCP_NODELAY are enabled.
                 print(f"Frame processed in {t_processing:.2f} secs")
             except Exception as e:
                 print("Error during communication with server:", e)
