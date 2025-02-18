@@ -45,10 +45,11 @@ class DynamicProcessor:
     def process(self, img_camera, img_mask_segmentation, img_diffusion, dynamic_func_coef=0.5):
         if not os.path.exists(self.fp_func):
             return img_camera
-        img_camera = np.asarray(img_camera)
-        img_mask_segmentation = np.asarray(img_mask_segmentation)
-        img_mask_segmentation = np.flip(img_mask_segmentation, axis=1)
-        img_diffusion = np.asarray(img_diffusion)
+        import torch
+        img_camera = torch.tensor(np.asarray(img_camera), device='cuda')
+        img_mask_segmentation = torch.tensor(np.asarray(img_mask_segmentation), device='cuda')
+        img_mask_segmentation = torch.flip(img_mask_segmentation, dims=[1])
+        img_diffusion = torch.tensor(np.asarray(img_diffusion), device='cuda')
 
         img_camera = lt.resize(img_camera, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
         img_mask_segmentation = lt.resize(img_mask_segmentation, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
@@ -66,11 +67,11 @@ class DynamicProcessor:
                 print("Dynamic module changed, reloading")
             if self.dynamic_module and self.dynamic_processor:
                 x = self.dynamic_processor.process(img_camera, img_mask_segmentation, img_diffusion, dynamic_func_coef=dynamic_func_coef)
-                return np.flip(x, axis=1)
+                return torch.flip(x, dims=[1]).cpu().numpy()
             else:
                 raise Exception("Dynamic Processor not available")
         except Exception as e:
-            fallback = np.array(img_camera, copy=True)
+            fallback = img_camera.cpu().numpy()
             if fallback.ndim == 3 and fallback.shape[2] >= 3:
                 h, w, c = fallback.shape
                 stripe_width = max(1, w // 5)
