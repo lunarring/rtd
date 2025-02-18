@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from rtd.utils.FastFlowNet_v2 import FastFlowNet
 from lunar_tools.cam import WebCam
 import time
+import argparse
+from matplotlib import pyplot as plt
 
 class OpticalFlowEstimator:
     """
@@ -124,34 +126,68 @@ class OpticalFlowEstimator:
         return flow
 
 if __name__ == "__main__":
-    cam = WebCam(cam_id=-1)
+    show_histogram = True  # Simple flag to control histogram display
+    flow_range = 20  # Increased range for visualization (-20 to +20)
+    
+    cam = WebCam()
     opt_flow_estimator = OpticalFlowEstimator()
+    
+    if show_histogram:
+        plt.ion()
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
+        plt.tight_layout(pad=3.0)
 
     while True:
-        start_time = time.time()  # Start timing
+        start_time = time.time()
 
         img = np.flip(cam.get_img(), axis=1).copy()
         flow = opt_flow_estimator.get_optflow(img, low_pass_kernel_size=55)
 
         if flow is not None:
-            height, width = flow.shape[:2]
-
-            # Convert the optical flow to a 3-channel image for display
-            magnitude, angle = cv2.cartToPolar(flow[..., 0], flow[..., 1])
-            hsv = np.zeros((height, width, 3), dtype=np.uint8)
-            hsv[..., 0] = angle * 180 / np.pi / 2  # Hue
-            hsv[..., 1] = 255  # Saturation
-            hsv[..., 2] = np.clip(magnitude * 5, 0, 255)
-            flow_bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-
-            # Resize the image to twice its original size for display
-            flow_bgr_resized = cv2.resize(flow_bgr, (width * 2, height * 2), interpolation=cv2.INTER_LINEAR)
-            cv2.imshow('Optical Flow', flow_bgr_resized)
+            # Normalize and display raw flow components
+            flow_x = flow[..., 0]
+            flow_y = flow[..., 1]
+            
+            # Scale flows for visualization (-20 to 20 range to 0-255)
+            flow_x_vis = np.clip((flow_x + flow_range) * (255/(2*flow_range)), 0, 255).astype(np.uint8)
+            flow_y_vis = np.clip((flow_y + flow_range) * (255/(2*flow_range)), 0, 255).astype(np.uint8)
+            
+            # Stack horizontally for display
+            combined_flow = np.hstack((flow_x_vis, flow_y_vis))
+            cv2.imshow('Raw Flow (X | Y)', combined_flow)
+            
+            if show_histogram:
+                # Clear previous plots
+                ax1.clear()
+                ax2.clear()
+                ax3.clear()
+                
+                # Plot X flow histogram
+                ax1.hist(flow_x.flatten(), bins=50, range=(-flow_range, flow_range))
+                ax1.set_title('X Flow Distribution')
+                ax1.set_xlabel('X Magnitude')
+                ax1.set_ylabel('Frequency')
+                
+                # Plot Y flow histogram
+                ax2.hist(flow_y.flatten(), bins=50, range=(-flow_range, flow_range))
+                ax2.set_title('Y Flow Distribution')
+                ax2.set_xlabel('Y Magnitude')
+                
+                # Plot combined magnitude histogram
+                magnitude = np.sqrt(flow_x**2 + flow_y**2)
+                ax3.hist(magnitude.flatten(), bins=50, range=(0, flow_range))
+                ax3.set_title('Flow Magnitude')
+                ax3.set_xlabel('Magnitude')
+                
+                plt.draw()
+                plt.pause(0.001)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-        end_time = time.time()  # End timing
-        print(f"Iteration time: {end_time - start_time:.4f} seconds")  # Print iteration time
+        end_time = time.time()
+        print(f"Iteration time: {end_time - start_time:.4f} seconds")
 
     cv2.destroyAllWindows()
+    if show_histogram:
+        plt.close()
