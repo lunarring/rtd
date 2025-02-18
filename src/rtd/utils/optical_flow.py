@@ -17,7 +17,7 @@ class OpticalFlowEstimator:
         div_size (int): The size to which input images are padded for processing.
         prev_img (np.ndarray): The previous image frame for flow calculation.
     """
-    def __init__(self, model_path='./checkpoints/fastflownet_ft_mix.pth', div_flow=20.0, div_size=64, device='cuda:0'):
+    def __init__(self, model_path='./checkpoints/fastflownet_ft_mix.pth', div_flow=20.0, div_size=64, return_numpy=True, device='cuda:0'):
         """
         Initializes the OpticalFlowEstimator with the specified model path, flow division factor, 
         division size, and device.
@@ -34,6 +34,7 @@ class OpticalFlowEstimator:
         self.div_flow = div_flow
         self.div_size = div_size
         self.prev_img = None
+        self.return_numpy = return_numpy
 
     def centralize(self, img1, img2):
         """
@@ -114,8 +115,11 @@ class OpticalFlowEstimator:
 
         # Apply low-pass filter if specified
         flow = self.low_pass_filter(flow, low_pass_kernel_size)
-        flow = flow[0].cpu().permute(1, 2, 0).numpy()
-        
+
+        flow = flow[0].permute(1, 2, 0)
+        if self.return_numpy:
+            flow = flow.cpu().numpy()
+
         self.prev_img = img
         return flow
 
