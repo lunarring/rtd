@@ -139,14 +139,14 @@ if __name__ == "__main__":
                 dynamic_processor.restore_backup()
             if dyn_prompt_del_current:
                 dynamic_processor.delete_current_fn_func()
-            img_acid = dynamic_processor.process(
+            img_proc = dynamic_processor.process(
                 img_cam.astype(np.float32),
                 human_seg_mask.astype(np.float32) / 255,
                 np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
                 opt_flow,
                 dynamic_func_coef=dynamic_func_coef,
             )
-            img_proc = np.clip(img_acid, 0, 255).astype(np.uint8)
+            img_acid = np.clip(img_proc, 0, 255).astype(np.uint8)
         else:
             fps_tracker.start_segment("Acid Proc")
             # Acid
