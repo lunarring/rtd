@@ -23,7 +23,7 @@ class BaseDynamicClass(ABC):
 
         Args:
             img_camera (torch.Tensor), range [0, 255]. Tensor has HEIGHT x WIDTH x 3. This is the webcam camera image in RGB format, showing people in front of the camera.
-            img_mask_segmentation (torch.Tensor): range [0, 1]. Tensor has HEIGHT x WIDTH. This is the human segmentation mask, where 1 means a person and 0 means background.
+            img_mask_segmentation (torch.Tensor): range [0, 1]. Tensor has HEIGHT x WIDTH. This is the human segmentation mask, where 1 means a human and 0 means background, for applying the mask we need to multiply an image with it.
             img_diffusion (torch.Tensor): Diffusion image. Range is [0, 255]. Tensor has HEIGHT x WIDTH x 3. This is the last image that the AI process yielded in the previous iteration.
             img_optical_flow (torch.Tensor): Range indicates the optical flow of the camera image. Tensor has HEIGHT x WIDTH x 2. The channels contain the x and y components of the motion vector at each pixel. Thus the values are typically very low, usually between -20 and 20.
             dynamic_func_coef (float): Dynamic function coefficient. Range is [0, 1]. This is a float parameter that is given by the user and we want to map it to modulate something interesting.

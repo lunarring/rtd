@@ -16,8 +16,7 @@ class HumanSeg:
     (deeplabv3_resnet101 by default) to predict the human body in the image and generate a mask. The mask can be 
     used for various applications like background removal, human pose estimation etc.
     
-    Attributes:
-        model: The pre-trained model used for human segmentation. available models: deeplabv3_resnet50 / deeplabv3_resnet101 / deeplabv3_mobilenet_v3_large
+    Attributes:model: The pre-trained model used for human segmentation. available models: deeplabv3_resnet50 / deeplabv3_resnet101 / deeplabv3_mobilenet_v3_large
         size (tuple, optional): The desired size (height, width) for the output tensor. If provided, this overrides the downscaling_factor.
         resizing_factor (float, optional): The factor by which to downscale the input tensor. Defaults to None. Ignored if size is provided.
         preprocess: The preprocessing transformations applied on the input image before feeding it to the model.
@@ -328,10 +327,10 @@ if __name__ == '__main__':
     import time
 
     shape_cam = (576, 1024)
-    cam = lt.WebCam(cam_id=-1, shape_hw=shape_cam)
+    cam = lt.WebCam(shape_hw=shape_cam)
     renderer = lt.Renderer(width=shape_cam[1], height=shape_cam[0], backend="pygame")
 
-    human_seg = HumanSeg(resizing_factor=0.5, device='cuda:2')
+    human_seg = HumanSeg(resizing_factor=0.5, device='cuda:0')
 
     while True:
         start_time = time.time()
