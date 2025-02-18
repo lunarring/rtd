@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 backup_dynamic*
+*.py~
 *.swp
 prompts/*
 dynamic_module.json
