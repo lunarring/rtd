@@ -186,7 +186,12 @@ class DynamicProcessor:
         except Exception as e:
             print(f"Failed to restore backup: {e}")
             return False
-    
+
+    def delete_current_fn_func(self):
+        """Empties the dynamic module file referenced by fn_func."""
+        with open(self.fp_func, "w") as f:
+            f.write("")
+
 if __name__ == "__main__":
     import numpy as np
     import time
