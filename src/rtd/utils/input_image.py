@@ -7,6 +7,7 @@ from .wobblers import WobbleMan
 from .segmentation_detection import HumanSeg
 import lunar_tools as lt
 from PIL import Image
+from .infrared.colorize_infrared import ImageColorizationPipelineHF
 
 
 def img2tensor(tensor):
@@ -146,7 +147,7 @@ class InputImageProcessor:
         do_human_seg=True,
         do_blur=False,
         blur_kernel=3,
-        is_infrared=False,
+        do_infrared_colorize=False,
         device="cuda",
     ):
         self.device = device
@@ -159,6 +160,9 @@ class InputImageProcessor:
             0.4  # how much humanseg img is downscaled internally, makes things faster.
         )
 
+        #  image colorization model for infrared images
+        self.infrared_colorizer = ImageColorizationPipelineHF()
+
         # human body segmentation
         self.human_seg = HumanSeg(
             resizing_factor=self.resizing_factor_humanseg, device=device
@@ -166,8 +170,8 @@ class InputImageProcessor:
         self.set_blur_size(self.blur_kernel)
 
         self.do_human_seg = do_human_seg
+        self.do_infrared_colorize = do_infrared_colorize
         self.do_blur = do_blur
-        self.is_infrared = is_infrared
         self.flip_axis = None
 
         self.list_history_frames = []
@@ -192,11 +196,11 @@ class InputImageProcessor:
     def set_blur(self, do_blur=True):
         self.do_blur = do_blur
 
-    def set_infrared(self, is_infrared=True):
-        self.is_infrared = is_infrared
-
     def set_human_seg(self, do_human_seg=True):
         self.do_human_seg = do_human_seg
+
+    def set_infrared_colorize(self, do_infrared_colorize=True):
+        self.do_infrared_colorize = do_infrared_colorize
 
     def set_flip(self, do_flip, flip_axis=1):
         if do_flip:
@@ -235,10 +239,8 @@ class InputImageProcessor:
 
         # if infrared, take mean of RGB channels and place it into red channel
         # the image can be then color-rotated with hue adjustments to fit the prompt color space
-        if self.is_infrared:
-            mean_intensity = img.mean(2)
-            img[:, :, 0] = mean_intensity
-            img[:, :, 1:] = 0
+        if self.do_infrared_colorize:
+            img = self.infrared_colorizer.process(img)
 
         # # time-averaging
         # self.list_history_frames.append(img)
