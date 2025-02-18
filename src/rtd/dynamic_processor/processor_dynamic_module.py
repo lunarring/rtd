@@ -159,8 +159,34 @@ class DynamicProcessor:
 
         # Inject completion message
         voice_ui.inject_message("I have completed the programming task according to your instructions.")
-
-
+    
+    def restore_backup(self):
+        """Restore the dynamic module file from the latest backup."""
+        try:
+            with importlib.resources.path("rtd.dynamic_processor", "") as p:
+                backup_dir = os.path.join(str(p), "backup")
+            backup_files = [
+                f for f in os.listdir(backup_dir)
+                if f.startswith("backup_dynamic_class_") and f.endswith(".py")
+            ]
+            if not backup_files:
+                print("No backup files found.")
+                return False
+            latest_backup = max(
+                backup_files,
+                key=lambda f: os.path.getmtime(os.path.join(backup_dir, f))
+            )
+            backup_path = os.path.join(backup_dir, latest_backup)
+            with open(backup_path, "rb") as bf:
+                backup_content = bf.read()
+            with open(self.fp_func, "wb") as df:
+                df.write(backup_content)
+            print(f"Restored dynamic module from {latest_backup}")
+            return True
+        except Exception as e:
+            print(f"Failed to restore backup: {e}")
+            return False
+    
 if __name__ == "__main__":
     import numpy as np
     import time
