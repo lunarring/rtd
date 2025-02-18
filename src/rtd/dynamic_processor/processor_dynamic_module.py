@@ -47,9 +47,6 @@ class DynamicProcessor:
         if not os.path.exists(self.fp_func):
             return img_camera
         
-        img_camera = lt.resize(img_camera, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
-        img_optical_flow = lt.resize(img_optical_flow, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
-        img_mask_segmentation = lt.resize(img_mask_segmentation, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
         
         img_camera = torch.tensor(np.asarray(img_camera), device='cuda')
         img_mask_segmentation = torch.tensor(np.asarray(img_mask_segmentation), device='cuda')
@@ -57,6 +54,9 @@ class DynamicProcessor:
         img_diffusion = torch.tensor(np.asarray(img_diffusion), device='cuda')
         img_optical_flow = torch.tensor(np.asarray(img_optical_flow), device='cuda')
 
+        img_camera = lt.resize(img_camera, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
+        img_optical_flow = lt.resize(img_optical_flow, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
+        img_mask_segmentation = lt.resize(img_mask_segmentation, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
         # print(f"img_camera.shape: {img_camera.shape}")
         # print(f"img_mask_segmentation.shape: {img_mask_segmentation.shape}")
         # print(f"img_diffusion.shape: {img_diffusion.shape}")

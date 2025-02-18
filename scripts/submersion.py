@@ -85,7 +85,7 @@ if __name__ == "__main__":
         do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="E3", button_mode="toggle", val_default=True)
         cycle_prompt = meta_input.get(akai_lpd8="C0", akai_midimix="C3", button_mode="pressed_once")
         do_acid_wobblers = meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
-        do_infrared_colorize = meta_input.get(akai_lpd8="D0", button_mode="toggle", val_default=False)
+        do_infrared_colorize = meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
 
         dyn_prompt_restore_backup = meta_input.get(akai_midimix="F3", button_mode="released_once")
