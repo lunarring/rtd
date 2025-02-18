@@ -149,7 +149,8 @@ if __name__ == "__main__":
                 human_seg_mask.astype(np.float32) / 255,
                 np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
                 opt_flow,
-                [dynamic_func_coef1, dynamic_func_coef2, dynamic_func_coef3],
+                dynamic_func_coef1,
+                # [dynamic_func_coef1, dynamic_func_coef2, dynamic_func_coef3],
             )
             img_acid = np.clip(img_proc, 0, 255).astype(np.uint8)
         else:
