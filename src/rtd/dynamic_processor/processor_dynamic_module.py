@@ -57,13 +57,13 @@ class DynamicProcessor:
             # Use the already resolved path from importlib.resources
             current_hash = self._compute_file_hash(self.fp_func)
             if self.module_hash is None or self.module_hash != current_hash:
-                print("Dynamic module changed, reloading")
                 spec = importlib.util.spec_from_file_location("dynamic_module", self.fp_func)
                 self.dynamic_module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(self.dynamic_module)
                 self.dynamic_processor = self.dynamic_module.DynamicClass()
                 self.module_hash = current_hash
                 self._backup_dynamic_class()  # Create backup when module changes
+                print("Dynamic module changed, reloading")
             if self.dynamic_module and self.dynamic_processor:
                 x = self.dynamic_processor.process(img_camera, img_mask_segmentation, img_diffusion, dynamic_func_coef=dynamic_func_coef)
                 return np.flip(x, axis=1)
