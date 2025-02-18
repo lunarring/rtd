@@ -9,8 +9,5 @@ class DynamicClass(BaseDynamicClass):
         img_diffusion: torch.Tensor,
         dynamic_func_coef: float,
     ) -> torch.Tensor:
-        # Multiply the camera image by the segmentation mask so that masked areas become zero.
-        result = img_camera * img_mask_segmentation
-        # Clamp the output to ensure values are in the valid range [0, 255]
-        result = torch.clamp(result, 0, 255)
-        return result
+        clamped_img = torch.clamp(img_camera, 0, 255)
+        return clamped_img

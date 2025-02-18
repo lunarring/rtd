@@ -3,6 +3,7 @@ from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
 import lunar_tools as lt
 from rtd.dynamic_processor.processor_dynamic_module import DynamicProcessor
 from rtd.utils.input_image import InputImageProcessor, AcidProcessor
+from rtd.utils.optical_flow import  OpticalFlowEstimator
 from rtd.utils.prompt_provider import (
     PromptProviderMicrophone,
     PromptProviderTxtFile,
@@ -10,6 +11,7 @@ from rtd.utils.prompt_provider import (
 import time
 import numpy as np
 from rtd.utils.frame_interpolation import AverageFrameInterpolator
+
 
 
 if __name__ == "__main__":
@@ -67,6 +69,8 @@ if __name__ == "__main__":
     speech_detector = lt.Speech2Text()
     prompt_provider = PromptProviderMicrophone()
 
+    opt_flow_estimator = OpticalFlowEstimator()
+
     # Initialize FPS tracking
     fps_tracker = lt.FPSTracker()
 
@@ -95,6 +99,7 @@ if __name__ == "__main__":
         y_shift = int(meta_input.get(akai_lpd8="H1", akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
         color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="G0", val_min=0, val_max=1, val_default=0.5)
         dynamic_func_coef = meta_input.get(akai_lpd8="G1", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
+        optical_flow_low_pass_kernel_size = int(meta_input.get(akai_midimix="F1", val_min=0, val_max=100, val_default=55))
 
         do_blur = True
         do_acid_tracers = True
@@ -113,8 +118,13 @@ if __name__ == "__main__":
                 de_img.set_embeddings(embeds)
 
         img_cam = cam.get_img()
+        
+        fps_tracker.start_segment("Optical Flow")
+        opt_flow = opt_flow_estimator.get_optflow(img_cam.copy(), low_pass_kernel_size=optical_flow_low_pass_kernel_size)
+
+
+        fps_tracker.start_segment("Input Image Proc")
         # Start timing image processing
-        fps_tracker.start_segment("Image Proc")
         input_image_processor.set_human_seg(do_human_seg)
         input_image_processor.set_blur(do_blur)
         img_proc, human_seg_mask = input_image_processor.process(img_cam)
@@ -124,6 +134,7 @@ if __name__ == "__main__":
         if new_dynamic_prompt_available:
             dynamic_processor.update_protoblock(speech_detector.transcript)
         if do_dynamic_processor and img_diffusion is not None:
+            fps_tracker.start_segment("Dynamic Proc")
             if dyn_prompt_restore_backup:
                 dynamic_processor.restore_backup()
             if dyn_prompt_del_current:
@@ -132,10 +143,12 @@ if __name__ == "__main__":
                 img_cam.astype(np.float32),
                 human_seg_mask.astype(np.float32) / 255,
                 np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
+                opt_flow,
                 dynamic_func_coef=dynamic_func_coef,
             )
             img_proc = np.clip(img_acid, 0, 255).astype(np.uint8)
         else:
+            fps_tracker.start_segment("Acid Proc")
             # Acid
             acid_processor.set_acid_strength(acid_strength)
             acid_processor.set_coef_noise(coef_noise)
@@ -149,7 +162,6 @@ if __name__ == "__main__":
             img_acid = acid_processor.process(img_proc, human_seg_mask)
 
         # Start timing diffusion
-        fps_tracker.start_segment("Acid Proc")
         de_img.set_input_image(img_acid)
         de_img.set_guidance_scale(0.5)
         de_img.set_strength(1 / de_img.num_inference_steps + 0.00001)
