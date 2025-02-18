@@ -41,7 +41,7 @@ class DynamicProcessor:
         self.dynamic_processor = None
         self.remove_existing_file = False
 
-        self.task_static = f"Write a class that derives from {self.fn_base_class}, from where you also gather insights about the range of the variables. You name the class you create DynamicClass. Critically it has to pass the existing tests in {self.fn_test}. You don't need to implement any further tests than this one."
+        self.task_static = f"Write a class that derives from a base class {self.fn_base_class}, from where you also gather insights about the range of the variables. You name the class you create DynamicClass. Critically it has to pass the existing tests in {self.fn_test}. Always make sure to at least pass all the variables that are listed in the base class, particularly the list of dynamic_func_coef. You don't need to implement any further tests than this one."
 
     def process(self, img_camera, img_mask_segmentation, img_diffusion, img_optical_flow, list_dynamic_coef=None):
         if not os.path.exists(self.fp_func):
