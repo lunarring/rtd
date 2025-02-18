@@ -16,6 +16,7 @@ dependencies = [
   "tokenizers==0.20.0",
   "spatial-correlation-sampler==0.4.0",
   "transformers==4.46.3",
+  "timm==1.0.14",
   "torch",
   "Pillow",
   "accelerate",
