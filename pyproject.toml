@@ -15,9 +15,11 @@ dependencies = [
   "diffusers==0.27.0",
   "tokenizers==0.15.0",
   "spatial-correlation-sampler==0.4.0",
-  "diffusers",
+  "diffusers==0.27.0",
+  "transformers==4.46.3",
   "torch",
   "Pillow",
+  "accelerate",
   "numpy",
 ]
 
