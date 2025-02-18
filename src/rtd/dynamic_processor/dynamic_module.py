@@ -58,13 +58,13 @@ class DynamicClass(BaseDynamicClass):
                 img_mask_segmentation: np.ndarray,
                 img_diffusion: np.ndarray,
                 dynamic_func_coef: float) -> np.ndarray:
+        img_camera = torch.tensor(img_camera, dtype=torch.float32, device=self.device)
+        img_mask_segmentation = torch.tensor(img_mask_segmentation, dtype=torch.float32, device=self.device)
+        img_diffusion = torch.tensor(img_diffusion, dtype=torch.float32, device=self.device)
         if not self.initialized:
             self._init_circles(img_camera.shape)
         self._update_circles(img_camera.shape, dynamic_func_coef)
         circles_overlay = self._draw_circles(img_camera.shape)
-        # Apply segmentation mask to camera image and combine with circles overlay
-        img_camera_t = torch.tensor(img_camera, dtype=torch.float32, device=self.device)
-        img_mask_t = torch.tensor(img_mask_segmentation, dtype=torch.float32, device=self.device)
-        result = (img_camera_t * img_mask_t) + circles_overlay
+        result = (img_camera * img_mask_segmentation) + circles_overlay
         result = torch.clamp(result, 0, 255)
         return result.cpu().numpy()
