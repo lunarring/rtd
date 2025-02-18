@@ -37,7 +37,7 @@ class TestDynamicModuleTests(unittest.TestCase):
         elapsed_time = (time.time() - start_time) * 1000  # ms
         self.assertLess(elapsed_time, 100, f"Processing took {elapsed_time:.2f}ms (>100ms)")
 
-    def test_output_range(self):/
+    def test_output_range(self):
         """Test that the output values are within the valid image range [0, 255]."""
         # Test with extreme input values using torch tensors
         img_camera = torch.rand(self.shape, dtype=torch.float32) * 300

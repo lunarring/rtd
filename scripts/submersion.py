@@ -145,7 +145,7 @@ if __name__ == "__main__":
             if dyn_prompt_del_current:
                 dynamic_processor.delete_current_fn_func()
             img_proc = dynamic_processor.process(
-                img_cam.astype(np.float32),
+                np.flip(img_proc, axis=1).astype(np.float32),
                 human_seg_mask.astype(np.float32) / 255,
                 np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
                 opt_flow,
