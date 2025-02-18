@@ -74,7 +74,7 @@ if __name__ == "__main__":
     # frame_interpolator = AverageFrameInterpolator(num_frames=n_frame_interpolations)
     while True:
         t_processing_start = time.time()
-
+        # bools
         dyn_prompt_mic_unmuter = meta_input.get(akai_lpd8="A0", akai_midimix="A3", button_mode="held_down")
         new_prompt_mic_unmuter = meta_input.get(akai_lpd8="A1", akai_midimix="B3", button_mode="held_down")
         do_dynamic_processor = meta_input.get(akai_lpd8="B0", akai_midimix="B4", button_mode="toggle", val_default=False)
@@ -82,6 +82,11 @@ if __name__ == "__main__":
         cycle_prompt = meta_input.get(akai_lpd8="C0", akai_midimix="C3", button_mode="pressed_once")
         do_acid_wobblers = meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
+
+        dyn_prompt_restore_backup = meta_input.get(akai_midimix="F3", button_mode="released_once")
+        dyn_prompt_del_current = meta_input.get(akai_midimix="F4", button_mode="released_once")
+        
+        # floats
         acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.11)
         acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.11)
         coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=1.0, val_default=0.15)
@@ -90,6 +95,7 @@ if __name__ == "__main__":
         y_shift = int(meta_input.get(akai_lpd8="H1", akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
         color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="G0", val_min=0, val_max=1, val_default=0.5)
         dynamic_func_coef = meta_input.get(akai_lpd8="G1", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
+
         do_blur = True
         do_acid_tracers = True
 
@@ -118,6 +124,10 @@ if __name__ == "__main__":
         if new_dynamic_prompt_available:
             dynamic_processor.update_protoblock(speech_detector.transcript)
         if do_dynamic_processor and img_diffusion is not None:
+            if dyn_prompt_restore_backup:
+                dynamic_processor.restore_backup()
+            if dyn_prompt_del_current:
+                dynamic_processor.delete_current_fn_func()
             img_acid = dynamic_processor.process(
                 img_cam.astype(np.float32),
                 human_seg_mask.astype(np.float32) / 255,

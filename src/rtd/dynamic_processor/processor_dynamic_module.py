@@ -53,22 +53,32 @@ class DynamicProcessor:
         img_camera = lt.resize(img_camera, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
         img_mask_segmentation = lt.resize(img_mask_segmentation, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
 
-        # Use the already resolved path from importlib.resources
-        current_hash = self._compute_file_hash(self.fp_func)
-
-        if self.module_hash is None or self.module_hash != current_hash:
-            print("Dynamic module changed, reloading")
-            spec = importlib.util.spec_from_file_location("dynamic_module", self.fp_func)
-            self.dynamic_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(self.dynamic_module)
-            self.dynamic_processor = self.dynamic_module.DynamicClass()
-            self.module_hash = current_hash
-            self._backup_dynamic_class()  # Create backup when module changes
-        if self.dynamic_module and self.dynamic_processor:
-            x = self.dynamic_processor.process(img_camera, img_mask_segmentation, img_diffusion, dynamic_func_coef=dynamic_func_coef)
-            return np.flip(x, axis=1)
-        else:
-            return img_camera
+        try:
+            # Use the already resolved path from importlib.resources
+            current_hash = self._compute_file_hash(self.fp_func)
+            if self.module_hash is None or self.module_hash != current_hash:
+                spec = importlib.util.spec_from_file_location("dynamic_module", self.fp_func)
+                self.dynamic_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(self.dynamic_module)
+                self.dynamic_processor = self.dynamic_module.DynamicClass()
+                self.module_hash = current_hash
+                self._backup_dynamic_class()  # Create backup when module changes
+                print("Dynamic module changed, reloading")
+            if self.dynamic_module and self.dynamic_processor:
+                x = self.dynamic_processor.process(img_camera, img_mask_segmentation, img_diffusion, dynamic_func_coef=dynamic_func_coef)
+                return np.flip(x, axis=1)
+            else:
+                raise Exception("Dynamic Processor not available")
+        except Exception as e:
+            fallback = np.array(img_camera, copy=True)
+            if fallback.ndim == 3 and fallback.shape[2] >= 3:
+                h, w, c = fallback.shape
+                stripe_width = max(1, w // 5)
+                center = w // 2
+                start = max(0, center - stripe_width // 2)
+                end = min(w, start + stripe_width)
+                fallback[:, start:end] = [0, 255, 0]
+            return fallback
 
     def _compute_file_hash(self, file_path: str) -> str:
         """Compute SHA-256 hash of file contents"""
