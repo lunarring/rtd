@@ -13,9 +13,8 @@ requires-python = ">=3.7"
 dependencies = [
   "huggingface_hub==0.25.1",
   "diffusers==0.27.0",
-  "tokenizers==0.15.0",
+  "tokenizers==0.20.0",
   "spatial-correlation-sampler==0.4.0",
-  "diffusers==0.27.0",
   "transformers==4.46.3",
   "torch",
   "Pillow",
