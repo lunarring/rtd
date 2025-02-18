@@ -67,9 +67,10 @@ class HumanSeg:
         input_image = input_image.convert("RGB")
         
         input_tensor = self.preprocess(input_image)
-        if self.resizing_factor is not None or self.size is not None:
-            size_orig = input_image.size
-            input_tensor = lt.resize(input_tensor, resizing_factor=self.resizing_factor, size=self.size)
+        if self.resizing_factor is not None:
+            input_tensor = lt.resize(input_tensor, resizing_factor=self.resizing_factor)
+        elif self.size is not None:
+            input_tensor = lt.resize(input_tensor, size=self.size)
 
         input_batch = input_tensor.unsqueeze(0) # create a mini-batch as expected by the model
         
