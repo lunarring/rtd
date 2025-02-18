@@ -98,7 +98,7 @@ if __name__ == "__main__":
         x_shift = int(meta_input.get(akai_lpd8="H0", akai_midimix="H0", val_min=-50, val_max=50, val_default=0))
         y_shift = int(meta_input.get(akai_lpd8="H1", akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
         color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="G0", val_min=0, val_max=1, val_default=0.5)
-        dynamic_func_coef = meta_input.get(akai_lpd8="G1", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
+        dynamic_func_coef = meta_input.get(akai_lpd8="G1", akai_midimix="F5", val_min=0, val_max=1, val_default=0.5)
         optical_flow_low_pass_kernel_size = int(meta_input.get(akai_midimix="F1", val_min=0, val_max=100, val_default=55))
 
         do_blur = True
