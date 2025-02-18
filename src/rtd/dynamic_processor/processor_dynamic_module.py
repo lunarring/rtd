@@ -72,7 +72,7 @@ class DynamicProcessor:
                 self._backup_dynamic_class()  # Create backup when module changes
                 print("Dynamic module changed, reloading")
             if self.dynamic_module and self.dynamic_processor:
-                x = self.dynamic_processor.process(img_camera, img_mask_segmentation, img_diffusion, img_optical_flow, dynamic_func_coef=dynamic_func_coef)
+                x = self.dynamic_processor.process(img_camera, img_mask_segmentation, img_diffusion, img_optical_flow, dynamic_func_coef)
                 return torch.flip(x, dims=[1]).cpu().numpy()
             else:
                 raise Exception("Dynamic Processor not available")

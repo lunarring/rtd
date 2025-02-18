@@ -99,7 +99,7 @@ if __name__ == "__main__":
         x_shift = int(meta_input.get(akai_lpd8="H0", akai_midimix="H0", val_min=-50, val_max=50, val_default=0))
         y_shift = int(meta_input.get(akai_lpd8="H1", akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
         color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="G0", val_min=0, val_max=1, val_default=0.5)
-        dynamic_func_coef = meta_input.get(akai_lpd8="G1", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
+        dynamic_func_coef = meta_input.get(akai_lpd8="G1", akai_midimix="F5", val_min=0, val_max=1, val_default=0.5)
         optical_flow_low_pass_kernel_size = int(meta_input.get(akai_midimix="F1", val_min=0, val_max=100, val_default=55))
 
         do_blur = True
@@ -141,14 +141,14 @@ if __name__ == "__main__":
                 dynamic_processor.restore_backup()
             if dyn_prompt_del_current:
                 dynamic_processor.delete_current_fn_func()
-            img_acid = dynamic_processor.process(
+            img_proc = dynamic_processor.process(
                 img_cam.astype(np.float32),
                 human_seg_mask.astype(np.float32) / 255,
                 np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
                 opt_flow,
                 dynamic_func_coef=dynamic_func_coef,
             )
-            img_proc = np.clip(img_acid, 0, 255).astype(np.uint8)
+            img_acid = np.clip(img_proc, 0, 255).astype(np.uint8)
         else:
             fps_tracker.start_segment("Acid Proc")
             # Acid
