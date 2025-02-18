@@ -43,10 +43,11 @@ class DynamicProcessor:
 
         self.task_static = f"Write a class that derives from {self.fn_base_class}, from where you also gather insights about the range of the variables. You name the class you create DynamicClass. Critically it has to pass the existing tests in {self.fn_test}. You don't need to implement any further tests than this one."
 
-    def process(self, img_camera, img_mask_segmentation, img_diffusion, img_optical_flow, dynamic_func_coef=0.5):
+    def process(self, img_camera, img_mask_segmentation, img_diffusion, img_optical_flow, list_dynamic_coef=None):
         if not os.path.exists(self.fp_func):
             return img_camera
-        
+        if list_dynamic_coef is None:
+            list_dynamic_coef = [0.5]
         
         img_camera = torch.tensor(np.asarray(img_camera), device='cuda')
         img_mask_segmentation = torch.tensor(np.asarray(img_mask_segmentation), device='cuda')
@@ -74,7 +75,7 @@ class DynamicProcessor:
                 self._backup_dynamic_class()  # Create backup when module changes
                 print("Dynamic module changed, reloading")
             if self.dynamic_module and self.dynamic_processor:
-                x = self.dynamic_processor.process(img_camera, img_mask_segmentation, img_diffusion, img_optical_flow, dynamic_func_coef)
+                x = self.dynamic_processor.process(img_camera, img_mask_segmentation, img_diffusion, img_optical_flow, list_dynamic_coef)
                 return torch.flip(x, dims=[1]).cpu().numpy()
             else:
                 raise Exception("Dynamic Processor not available")

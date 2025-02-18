@@ -95,12 +95,15 @@ if __name__ == "__main__":
         acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.11)
         acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.11)
         coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=1.0, val_default=0.15)
-        zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="F0", val_min=0.5, val_max=1.5, val_default=1.0)
+        zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="A2", val_min=0.5, val_max=1.5, val_default=1.0)
         x_shift = int(meta_input.get(akai_lpd8="H0", akai_midimix="H0", val_min=-50, val_max=50, val_default=0))
         y_shift = int(meta_input.get(akai_lpd8="H1", akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
         color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="G0", val_min=0, val_max=1, val_default=0.5)
-        dynamic_func_coef = meta_input.get(akai_lpd8="G1", akai_midimix="F5", val_min=0, val_max=1, val_default=0.5)
-        optical_flow_low_pass_kernel_size = int(meta_input.get(akai_midimix="F1", val_min=0, val_max=100, val_default=55))
+        optical_flow_low_pass_kernel_size = int(meta_input.get(akai_midimix="B1", val_min=0, val_max=100, val_default=55))
+        
+        dynamic_func_coef1 = meta_input.get(akai_midimix="F0", val_min=0, val_max=1, val_default=0.5)
+        dynamic_func_coef2 = meta_input.get(akai_midimix="F1", val_min=0, val_max=1, val_default=0.5)
+        dynamic_func_coef3 = meta_input.get(akai_midimix="F2", val_min=0, val_max=1, val_default=0.5)
 
         do_blur = True
         do_acid_tracers = True
@@ -146,7 +149,7 @@ if __name__ == "__main__":
                 human_seg_mask.astype(np.float32) / 255,
                 np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
                 opt_flow,
-                dynamic_func_coef=dynamic_func_coef,
+                [dynamic_func_coef1, dynamic_func_coef2, dynamic_func_coef3],
             )
             img_acid = np.clip(img_proc, 0, 255).astype(np.uint8)
         else:
