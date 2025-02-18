@@ -75,6 +75,7 @@ class DynamicProcessor:
             else:
                 raise Exception("Dynamic Processor not available")
         except Exception as e:
+            print(f"dynamic module reloading failed: {e}")
             fallback = img_camera.cpu().numpy()
             if fallback.ndim == 3 and fallback.shape[2] >= 3:
                 h, w, c = fallback.shape

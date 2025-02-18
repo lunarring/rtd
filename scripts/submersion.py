@@ -75,8 +75,8 @@ if __name__ == "__main__":
     while True:
         t_processing_start = time.time()
         # bools
-        dyn_prompt_mic_unmuter = meta_input.get(akai_lpd8="A0", akai_midimix="A3", button_mode="held_down")
-        new_prompt_mic_unmuter = meta_input.get(akai_lpd8="A1", akai_midimix="B3", button_mode="held_down")
+        dyn_prompt_mic_unmuter = meta_input.get(akai_lpd8="A0", akai_midimix="B3", button_mode="held_down")
+        new_prompt_mic_unmuter = meta_input.get(akai_lpd8="A1", akai_midimix="A3", button_mode="held_down")
         do_dynamic_processor = meta_input.get(akai_lpd8="B0", akai_midimix="B4", button_mode="toggle", val_default=False)
         do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="E3", button_mode="toggle", val_default=True)
         cycle_prompt = meta_input.get(akai_lpd8="C0", akai_midimix="C3", button_mode="pressed_once")
