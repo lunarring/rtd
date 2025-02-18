@@ -12,7 +12,7 @@ class TestDynamicModule(DynamicClass):
 class TestDynamicModuleTests(unittest.TestCase):
     def setUp(self):
         # Create sample test data with known shapes and float32 data type
-        self.shape = (1024, 1024, 3)  # Example shape for RGB image
+        self.shape = (768, 1024, 3)  # Example shape for RGB image
         self.img_camera = torch.ones(self.shape, dtype=torch.float32)
         self.img_mask = torch.zeros(self.shape, dtype=torch.float32)
         self.img_diffusion = torch.full(self.shape, 0.5, dtype=torch.float32)
