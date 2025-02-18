@@ -186,6 +186,10 @@ class DynamicProcessor:
         except Exception as e:
             print(f"Failed to restore backup: {e}")
             return False
+    def delete_fn_func(self):
+        """Delete or reset the fn_func attribute."""
+        if hasattr(self, 'fn_func'):
+            del self.fn_func
     
 if __name__ == "__main__":
     import numpy as np
