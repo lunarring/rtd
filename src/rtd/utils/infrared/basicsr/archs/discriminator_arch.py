@@ -3,8 +3,8 @@ import torch.nn as nn
 from torchvision import models
 import numpy as np
 
-from basicsr.archs.ddcolor_arch_utils.unet import _conv
-from basicsr.utils.registry import ARCH_REGISTRY
+from rtd.utils.infrared.basicsr.archs.ddcolor_arch_utils.unet import _conv
+from rtd.utils.infrared.basicsr.utils.registry import ARCH_REGISTRY
 
 
 @ARCH_REGISTRY.register()

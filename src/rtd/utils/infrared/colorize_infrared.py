@@ -8,8 +8,8 @@ import lunar_tools as lt
 import time
 import numpy as np
 
-from ddcolor_model import DDColor
-from infer import ImageColorizationPipeline
+from .ddcolor_model import DDColor
+from .infer import ImageColorizationPipeline
 
 class ImageColorizationPipelineHF(ImageColorizationPipeline):
     # Nested merged model class combining DDColor with the HF-loading mixin

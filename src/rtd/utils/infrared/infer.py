@@ -6,7 +6,7 @@ import numpy as np
 import torch.nn.functional as F
 from tqdm import tqdm
 
-from ddcolor_model import DDColor
+from .ddcolor_model import DDColor
 
 
 class ImageColorizationPipeline:

@@ -4,7 +4,7 @@ from collections import OrderedDict
 from torch import nn as nn
 from torchvision.models import vgg as vgg
 
-from basicsr.utils.registry import ARCH_REGISTRY
+from rtd.utils.infrared.basicsr.utils.registry import ARCH_REGISTRY
 
 VGG_PRETRAIN_PATH = {
     'vgg19': './pretrain/vgg19-dcbb9e9d.pth',

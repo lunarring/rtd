@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 
-from basicsr.archs.ddcolor_arch_utils.unet import Hook, CustomPixelShuffle_ICNR,  UnetBlockWide, NormType, custom_conv_layer
-from basicsr.archs.ddcolor_arch_utils.convnext import ConvNeXt
-from basicsr.archs.ddcolor_arch_utils.transformer_utils import SelfAttentionLayer, CrossAttentionLayer, FFNLayer, MLP
-from basicsr.archs.ddcolor_arch_utils.position_encoding import PositionEmbeddingSine
+from .basicsr.archs.ddcolor_arch_utils.unet import Hook, CustomPixelShuffle_ICNR,  UnetBlockWide, NormType, custom_conv_layer
+from .basicsr.archs.ddcolor_arch_utils.convnext import ConvNeXt
+from .basicsr.archs.ddcolor_arch_utils.transformer_utils import SelfAttentionLayer, CrossAttentionLayer, FFNLayer, MLP
+from .basicsr.archs.ddcolor_arch_utils.position_encoding import PositionEmbeddingSine
 
 
 class DDColor(nn.Module):

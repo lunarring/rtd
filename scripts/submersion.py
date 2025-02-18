@@ -85,6 +85,7 @@ if __name__ == "__main__":
         do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="E3", button_mode="toggle", val_default=True)
         cycle_prompt = meta_input.get(akai_lpd8="C0", akai_midimix="C3", button_mode="pressed_once")
         do_acid_wobblers = meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
+        do_infrared_colorize = meta_input.get(akai_lpd8="D0", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
 
         dyn_prompt_restore_backup = meta_input.get(akai_midimix="F3", button_mode="released_once")
@@ -127,6 +128,7 @@ if __name__ == "__main__":
         # Start timing image processing
         input_image_processor.set_human_seg(do_human_seg)
         input_image_processor.set_blur(do_blur)
+        input_image_processor.set_infrared_colorize(do_infrared_colorize)
         img_proc, human_seg_mask = input_image_processor.process(img_cam)
 
         new_dynamic_prompt_available = speech_detector.handle_unmute_button(dyn_prompt_mic_unmuter)
