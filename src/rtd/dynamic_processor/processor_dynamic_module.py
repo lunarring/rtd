@@ -55,9 +55,9 @@ class DynamicProcessor:
         img_diffusion = torch.tensor(np.asarray(img_diffusion), device='cuda')
 
 
-        print(f"img_camera.shape: {img_camera.shape}")
-        print(f"img_mask_segmentation.shape: {img_mask_segmentation.shape}")
-        print(f"img_diffusion.shape: {img_diffusion.shape}")
+        # print(f"img_camera.shape: {img_camera.shape}")
+        # print(f"img_mask_segmentation.shape: {img_mask_segmentation.shape}")
+        # print(f"img_diffusion.shape: {img_diffusion.shape}")
 
         return img_camera.cpu().numpy()
 
