@@ -6,7 +6,7 @@ import hashlib
 import os
 from tac.protoblock.protoblock import ProtoBlock
 from tac.protoblock.factory import ProtoBlockFactory
-from tac.core.executor import ProtoBlockExecutor
+from tac.core.block_runner import BlockRunner
 import rtd.dynamic_processor
 from tac.cli.voice import VoiceUI
 import datetime
@@ -140,18 +140,15 @@ class DynamicProcessor:
         # Create config override dictionary to disable git and plausibility check
         config_override = {}
         config_override["git"] = {"enabled": False}
-        config_override["general"] = {"plausibility_test": False, "test_path": self.fp_test}
+        config_override["general"] = {"plausibility_test": False, "test_path": self.fp_test, "type": "native"}
 
         # Remove the function file if it exists
         if self.remove_existing_file:
             if os.path.exists(self.fp_func):
                 os.remove(self.fp_func)
 
-        # Create executor with the protoblock and config override
-        executor = ProtoBlockExecutor(protoblock=self.protoblock, config_override=config_override, codebase="")
-
-        # Execute the block (this will run tests, make changes, etc.)
-        executor.execute_block()
+        block_runner = BlockRunner(json_file=self.fp_proto, config_override=config_override)
+        return block_runner.run_loop()
 
     def update_protoblock(self, task_user=None):
         if task_user is None:
