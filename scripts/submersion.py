@@ -123,7 +123,7 @@ if __name__ == "__main__":
         img_cam = cam.get_img()
 
         fps_tracker.start_segment("Optical Flow")
-        opt_flow = opt_flow_estimator.get_optflow(img_cam.copy(), low_pass_kernel_size=optical_flow_low_pass_kernel_size)
+        opt_flow = opt_flow_estimator.get_optflow(img_cam.copy(), low_pass_kernel_size=optical_flow_low_pass_kernel_size, window_length=15)
 
         fps_tracker.start_segment("Input Image Proc")
         # Start timing image processing

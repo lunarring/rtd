@@ -40,9 +40,7 @@ def tensor2image(input_data):
         return input_data
 
     # Ensure the tensor is on the CPU and convert to a numpy array
-    converted_data = (
-        input_data.cpu().numpy() if input_data.is_cuda else input_data.numpy()
-    )
+    converted_data = input_data.cpu().numpy() if input_data.is_cuda else input_data.numpy()
     if len(converted_data.shape) == 4:
         converted_data = converted_data[0, :, :, :]
     converted_data = np.clip(converted_data * 255, 0, 255)
@@ -103,9 +101,7 @@ def zoom_image_torch(input_tensor, zoom_factor):
                 start_col : start_col + original_width,
             ]
 
-        return zoomed_tensor.squeeze(0).permute(
-            1, 2, 0
-        )  # Remove batch dimension before returning
+        return zoomed_tensor.squeeze(0).permute(1, 2, 0)  # Remove batch dimension before returning
     except Exception as e:
         print(f"zoom_image_torch failed! {e}. returning original input")
         return input_tensor
@@ -120,11 +116,11 @@ def torch_resample(tex, grid, padding_mode="reflection", mode="bilinear"):
             grid.view((1,) + grid.shape),
             padding_mode=padding_mode,
             mode=mode,
-        )[0, :, :, :].permute([1, 2, 0])
+        )[
+            0, :, :, :
+        ].permute([1, 2, 0])
     elif len(tex.shape) == 4:
-        return F.grid_sample(
-            tex, grid.view((1,) + grid.shape), padding_mode=padding_mode, mode=mode
-        )[0, :, :, :].permute([1, 2, 0])
+        return F.grid_sample(tex, grid.view((1,) + grid.shape), padding_mode=padding_mode, mode=mode)[0, :, :, :].permute([1, 2, 0])
     else:
         raise ValueError("torch_resample: bad input dims")
 
@@ -156,17 +152,13 @@ class InputImageProcessor:
         self.hue_rotation_angle = 0
         self.blur = None
         self.blur_kernel = blur_kernel
-        self.resizing_factor_humanseg = (
-            0.4  # how much humanseg img is downscaled internally, makes things faster.
-        )
+        self.resizing_factor_humanseg = 0.4  # how much humanseg img is downscaled internally, makes things faster.
 
         #  image colorization model for infrared images
         self.infrared_colorizer = ImageColorizationPipelineHF()
 
         # human body segmentation
-        self.human_seg = HumanSeg(
-            resizing_factor=self.resizing_factor_humanseg, device=device
-        )
+        self.human_seg = HumanSeg(resizing_factor=self.resizing_factor_humanseg, device=device)
         self.set_blur_size(self.blur_kernel)
 
         self.do_human_seg = do_human_seg
@@ -220,12 +212,7 @@ class InputImageProcessor:
 
         if self.do_blur:
             img_torch = torch.from_numpy(img.copy()).to(self.device).float()
-            img = (
-                self.blur(img_torch.permute([2, 0, 1])[None])[0]
-                .permute([1, 2, 0])
-                .cpu()
-                .numpy()
-            )
+            img = self.blur(img_torch.permute([2, 0, 1])[None])[0].permute([1, 2, 0]).cpu().numpy()
 
         # human body segmentation mask
         if self.do_human_seg:
@@ -361,9 +348,7 @@ class AcidProcessor:
         if is_input_tensor:
             list_images_gpu = [img.clone().float() for img in list_images]
         else:
-            list_images_gpu = [
-                torch.from_numpy(img.copy()).float().cuda(gpu) for img in list_images
-            ]
+            list_images_gpu = [torch.from_numpy(img.copy()).float().cuda(gpu) for img in list_images]
 
         if clip_max == "auto":
             clip_max = 255 if list_images[0].max() > 16 else 1
@@ -427,9 +412,7 @@ class AcidProcessor:
             image_input = image_input.cpu().numpy()
             image_input = np.asarray(255 * image_input, dtype=np.uint8)
         if self.last_diffusion_image_torch is None:
-            print(
-                "InputImageProcessor: last_diffusion_image_torch=None. returning original image..."
-            )
+            print("InputImageProcessor: last_diffusion_image_torch=None. returning original image...")
             return image_input
 
         last_diffusion_image_torch = self.last_diffusion_image_torch
@@ -440,18 +423,14 @@ class AcidProcessor:
         # wobblers
         if self.do_acid_wobblers:
             required_keys = ["amp", "frequency", "edge_amp"]
-            wobbler_control_kwargs_are_good = all(
-                key in self.wobbler_control_kwargs for key in required_keys
-            )
+            wobbler_control_kwargs_are_good = all(key in self.wobbler_control_kwargs for key in required_keys)
             if not wobbler_control_kwargs_are_good:
                 print(
                     "Some keys are missing in wobbler_control_kwargs. Required keys are: ",
                     required_keys,
                 )
             else:
-                resample_grid = self.wobbleman.do_acid(
-                    last_diffusion_image_torch, self.wobbler_control_kwargs
-                )
+                resample_grid = self.wobbleman.do_acid(last_diffusion_image_torch, self.wobbler_control_kwargs)
                 last_diffusion_image_torch = torch_resample(
                     last_diffusion_image_torch.permute([2, 0, 1]),
                     ((resample_grid * 2) - 1),
@@ -459,17 +438,15 @@ class AcidProcessor:
 
         # zoom
         if self.zoom_factor != 1 and self.zoom_factor > 0:
-            last_diffusion_image_torch = zoom_image_torch(
-                last_diffusion_image_torch, self.zoom_factor
-            )
+            last_diffusion_image_torch = zoom_image_torch(last_diffusion_image_torch, self.zoom_factor)
 
         # rotations
         if self.rotation_angle != 0:
             padding = int(last_diffusion_image_torch.shape[1] // (2 * np.sqrt(2)))
             padding = (padding, padding)
-            last_diffusion_image_torch = transforms.Pad(
-                padding=padding, padding_mode="reflect"
-            )(last_diffusion_image_torch.permute(2, 0, 1))
+            last_diffusion_image_torch = transforms.Pad(padding=padding, padding_mode="reflect")(
+                last_diffusion_image_torch.permute(2, 0, 1)
+            )
             last_diffusion_image_torch = transforms.functional.rotate(
                 last_diffusion_image_torch,
                 angle=self.rotation_angle,
@@ -483,15 +460,10 @@ class AcidProcessor:
 
         # acid plane translations
         if self.x_shift != 0 or self.y_shift != 0:
-            last_diffusion_image_torch = torch.roll(
-                last_diffusion_image_torch, (self.y_shift, self.x_shift), (0, 1)
-            )
+            last_diffusion_image_torch = torch.roll(last_diffusion_image_torch, (self.y_shift, self.x_shift), (0, 1))
 
         img_input_torch = torch.from_numpy(image_input.copy()).to(self.device).float()
-        if (
-            img_input_torch.shape[0] != height_diffusion
-            or img_input_torch.shape[1] != width_diffusion
-        ):
+        if img_input_torch.shape[0] != height_diffusion or img_input_torch.shape[1] != width_diffusion:
             img_input_torch = lt.resize(
                 img_input_torch.permute((2, 0, 1)),
                 size=(height_diffusion, width_diffusion),
@@ -501,43 +473,22 @@ class AcidProcessor:
             if len(human_seg_mask.shape) == 3:
                 human_seg_mask = human_seg_mask[:, :, 0] / 255
 
-            human_seg_mask_resized = np.expand_dims(
-                cv2.resize(human_seg_mask, (width_diffusion, height_diffusion)), 2
-            )
-            human_seg_mask_torch = torch.from_numpy(human_seg_mask_resized).to(
-                self.device
-            )
+            human_seg_mask_resized = np.expand_dims(cv2.resize(human_seg_mask, (width_diffusion, height_diffusion)), 2)
+            human_seg_mask_torch = torch.from_numpy(human_seg_mask_resized).to(self.device)
 
             img_input_torch_current = img_input_torch.clone()
+            img_input_torch = (1.0 - self.acid_strength) * img_input_torch + self.acid_strength * last_diffusion_image_torch
+            img_input_torch = human_seg_mask_torch * img_input_torch_current + (1 - human_seg_mask_torch) * img_input_torch
             img_input_torch = (
-                1.0 - self.acid_strength
-            ) * img_input_torch + self.acid_strength * last_diffusion_image_torch
-            img_input_torch = (
-                human_seg_mask_torch * img_input_torch_current
-                + (1 - human_seg_mask_torch) * img_input_torch
-            )
-            img_input_torch = (
-                (1.0 - self.acid_strength_foreground) * img_input_torch
-                + self.acid_strength_foreground * last_diffusion_image_torch
-            )
+                1.0 - self.acid_strength_foreground
+            ) * img_input_torch + self.acid_strength_foreground * last_diffusion_image_torch
         else:
-            img_input_torch = (
-                1.0 - self.acid_strength
-            ) * img_input_torch + self.acid_strength * last_diffusion_image_torch
+            img_input_torch = (1.0 - self.acid_strength) * img_input_torch + self.acid_strength * last_diffusion_image_torch
 
         # additive noise
         if self.coef_noise > 0:
             torch.manual_seed(420)
-            t_rand = (
-                (
-                    torch.rand(img_input_torch.shape, device=img_input_torch.device)[
-                        :, :, 0
-                    ].unsqueeze(2)
-                    - 0.5
-                )
-                * self.coef_noise
-                * 255
-            )
+            t_rand = (torch.rand(img_input_torch.shape, device=img_input_torch.device)[:, :, 0].unsqueeze(2) - 0.5) * self.coef_noise * 255
             img_input_torch += t_rand
 
         # Apply color matching if enabled
@@ -547,11 +498,7 @@ class AcidProcessor:
                     human_seg_mask = np.expand_dims(human_seg_mask, axis=2)
                 mask_torch = (
                     F.interpolate(
-                        torch.from_numpy(human_seg_mask)
-                        .to(self.device)
-                        .float()
-                        .permute(2, 0, 1)
-                        .unsqueeze(0),
+                        torch.from_numpy(human_seg_mask).to(self.device).float().permute(2, 0, 1).unsqueeze(0),
                         size=last_diffusion_image_torch.shape[:2],
                         mode="bilinear",
                         align_corners=False,
@@ -559,10 +506,10 @@ class AcidProcessor:
                     .squeeze(0)
                     .permute(1, 2, 0)
                 )
+                # Threshold to make mask binary (0 or 1)
+                mask_torch = (mask_torch > 0.5).float()
                 # Use binary mask by applying the mask directly
-                last_diffusion_image_torch_masked = (
-                    last_diffusion_image_torch  # * mask_torch
-                )
+                last_diffusion_image_torch_masked = last_diffusion_image_torch * mask_torch
                 img_input_torch, _ = self.multi_match_gpu(
                     [img_input_torch, last_diffusion_image_torch_masked],
                     weights=[1 - self.color_matching, self.color_matching],
@@ -586,9 +533,7 @@ class AcidProcessor:
         # Convert PIL Image to numpy array if needed
         if isinstance(img_diffusion, Image.Image):
             img_diffusion = np.array(img_diffusion)
-        self.last_diffusion_image_torch = torch.from_numpy(img_diffusion).to(
-            self.device, dtype=torch.float
-        )
+        self.last_diffusion_image_torch = torch.from_numpy(img_diffusion).to(self.device, dtype=torch.float)
 
 
 if __name__ == "__main__":
