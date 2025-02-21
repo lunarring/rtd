@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 from rtd.dynamic_processor.base_dynamic_module import BaseDynamicClass
 
+
 class DynamicClass(BaseDynamicClass):
     def __init__(self):
         super().__init__()
@@ -14,11 +15,11 @@ class DynamicClass(BaseDynamicClass):
         img_mask_segmentation: torch.Tensor,
         img_diffusion: torch.Tensor,
         img_optical_flow: torch.Tensor,
-        dynamic_func_coef
+        dynamic_func_coef,
     ) -> torch.Tensor:
         """
         Process the input images using accumulated optical flow information
-        to resample the camera and diffusion images and blend them according to 
+        to resample the camera and diffusion images and blend them according to
         dynamic_func_coef.
         """
         # Ensure dynamic_func_coef is a list; if not, wrap it.
@@ -41,11 +42,7 @@ class DynamicClass(BaseDynamicClass):
         device = img_camera.device
 
         # Create normalized coordinate grid in the range [-1, 1]
-        yy, xx = torch.meshgrid(
-            torch.linspace(-1, 1, H, device=device),
-            torch.linspace(-1, 1, W, device=device),
-            indexing="ij"
-        )
+        yy, xx = torch.meshgrid(torch.linspace(-1, 1, H, device=device), torch.linspace(-1, 1, W, device=device), indexing="ij")
         base_grid = torch.stack((xx, yy), dim=-1)  # (H, W, 2)
 
         # Normalize the averaged optical flow to be in the same scale as the grid.
@@ -59,12 +56,7 @@ class DynamicClass(BaseDynamicClass):
         def warp(img):
             # Convert to shape (1, C, H, W)
             img_t = img.permute(2, 0, 1).unsqueeze(0)
-            warped = F.grid_sample(
-                img_t,
-                sampling_grid.unsqueeze(0),
-                mode='bilinear',
-                align_corners=True
-            )
+            warped = F.grid_sample(img_t, sampling_grid.unsqueeze(0), mode="bilinear", align_corners=True)
             # Return to (H, W, C)
             return warped.squeeze(0).permute(1, 2, 0)
 

@@ -9,6 +9,44 @@ class BaseDynamicClass(ABC):
         """Initialize the base dynamic class."""
         pass
 
+    def assert_inputs(
+        self,
+        img_camera: torch.Tensor,
+        img_mask_segmentation: torch.Tensor,
+        img_diffusion: torch.Tensor,
+        img_optical_flow: torch.Tensor,
+        dynamic_coef: float,
+    ) -> None:
+        """
+        Validate input shapes and types.
+
+        Args:
+            Same as process() method.
+
+        Raises:
+            AssertionError: If any of the input validations fail.
+        """
+        # Check that camera, mask and diffusion have same shape
+        msg = "Camera shape {} does not match mask shape {}"
+        assert img_camera.shape == img_mask_segmentation.shape[:2] + (3,), msg.format(img_camera.shape, img_mask_segmentation.shape)
+
+        msg = "Camera shape {} does not match diffusion shape {}"
+        assert img_camera.shape == img_diffusion.shape, msg.format(img_camera.shape, img_diffusion.shape)
+
+        # Check optical flow height/width matches camera
+        msg = "Optical flow height {} does not match camera height {}"
+        assert img_optical_flow.shape[0] == img_camera.shape[0], msg.format(img_optical_flow.shape[0], img_camera.shape[0])
+
+        msg = "Optical flow width {} does not match camera width {}"
+        assert img_optical_flow.shape[1] == img_camera.shape[1], msg.format(img_optical_flow.shape[1], img_camera.shape[1])
+
+        # Verify dynamic_coef is a scalar float
+        msg = "dynamic_coef must be a float, got {}"
+        assert isinstance(dynamic_coef, float), msg.format(type(dynamic_coef))
+
+        msg = "dynamic_coef must be a scalar, not a sequence"
+        assert not isinstance(dynamic_coef, (list, tuple, np.ndarray)), msg
+
     @abstractmethod
     def process(
         self,

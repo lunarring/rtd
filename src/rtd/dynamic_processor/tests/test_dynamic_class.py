@@ -5,23 +5,17 @@ from rtd.dynamic_processor.base_dynamic_module import BaseDynamicClass
 from dynamic_module import DynamicClass
 
 
-class TestDynamicModule(DynamicClass):
-    """Concrete implementation of BaseDynamicClass for testing."""
-
-    pass
-
-
 class TestDynamicModuleTests(unittest.TestCase):
     def setUp(self):
         # Create sample test data with known shapes and float32 data type
         self.shape_3 = (768, 1024, 3)  # Example shape for RGB image
         self.shape_2 = (768, 1024, 2)  # Example shape for RGB image
-        self.img_camera = torch.ones(self.shape_3, dtype=torch.float32)
-        self.img_mask = torch.zeros(self.shape_3, dtype=torch.float32)
-        self.img_diffusion = torch.full(self.shape_3, 0.5, dtype=torch.float32)
-        self.img_optical_flow = torch.full(self.shape_2, 0.5, dtype=torch.float32)
+        self.img_camera = torch.ones(self.shape_3, dtype=torch.float32, device="cuda")
+        self.img_mask = torch.zeros(self.shape_3, dtype=torch.float32, device="cuda")
+        self.img_diffusion = torch.full(self.shape_3, 0.5, dtype=torch.float32, device="cuda")
+        self.img_optical_flow = torch.full(self.shape_2, 0.5, dtype=torch.float32, device="cuda")
         self.dynamic_coef = 0.5  # Single coefficient
-        self.processor = TestDynamicModule()
+        self.processor = DynamicClass()
 
     def test_output_shape(self):
         """Test that output shape matches input shape"""
