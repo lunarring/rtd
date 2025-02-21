@@ -3,7 +3,7 @@ from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
 import lunar_tools as lt
 from rtd.dynamic_processor.processor_dynamic_module import DynamicProcessor
 from rtd.utils.input_image import InputImageProcessor, AcidProcessor
-from rtd.utils.optical_flow import  OpticalFlowEstimator
+from rtd.utils.optical_flow import OpticalFlowEstimator
 from rtd.utils.prompt_provider import (
     PromptProviderMicrophone,
     PromptProviderTxtFile,
@@ -11,7 +11,6 @@ from rtd.utils.prompt_provider import (
 import time
 import numpy as np
 from rtd.utils.frame_interpolation import AverageFrameInterpolator
-
 
 
 if __name__ == "__main__":
@@ -24,7 +23,7 @@ if __name__ == "__main__":
     do_compile = False
     do_diffusion = True
     do_fullscreen = True
-    
+
     device = "cuda:0"
     img_diffusion = None
 
@@ -90,7 +89,7 @@ if __name__ == "__main__":
 
         dyn_prompt_restore_backup = meta_input.get(akai_midimix="F3", button_mode="released_once")
         dyn_prompt_del_current = meta_input.get(akai_midimix="F4", button_mode="released_once")
-        
+
         # floats
         acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.11)
         acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.11)
@@ -100,7 +99,7 @@ if __name__ == "__main__":
         y_shift = int(meta_input.get(akai_lpd8="H1", akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
         color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="G0", val_min=0, val_max=1, val_default=0.5)
         optical_flow_low_pass_kernel_size = int(meta_input.get(akai_midimix="B1", val_min=0, val_max=100, val_default=55))
-        
+
         dynamic_func_coef1 = meta_input.get(akai_midimix="F0", val_min=0, val_max=1, val_default=0.5)
         dynamic_func_coef2 = meta_input.get(akai_midimix="F1", val_min=0, val_max=1, val_default=0.5)
         dynamic_func_coef3 = meta_input.get(akai_midimix="F2", val_min=0, val_max=1, val_default=0.5)
@@ -122,10 +121,9 @@ if __name__ == "__main__":
                 de_img.set_embeddings(embeds)
 
         img_cam = cam.get_img()
-        
+
         fps_tracker.start_segment("Optical Flow")
         opt_flow = opt_flow_estimator.get_optflow(img_cam.copy(), low_pass_kernel_size=optical_flow_low_pass_kernel_size)
-
 
         fps_tracker.start_segment("Input Image Proc")
         # Start timing image processing
@@ -148,7 +146,7 @@ if __name__ == "__main__":
                 np.flip(img_proc, axis=1).astype(np.float32),
                 human_seg_mask.astype(np.float32) / 255,
                 np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
-                np.flip(opt_flow, axis=1).copy(),
+                opt_flow,
                 dynamic_func_coef1,
                 # [dynamic_func_coef1, dynamic_func_coef2, dynamic_func_coef3],
             )
