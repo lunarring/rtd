@@ -14,11 +14,12 @@ class TestDynamicModule(DynamicClass):
 class TestDynamicModuleTests(unittest.TestCase):
     def setUp(self):
         # Create sample test data with known shapes and float32 data type
-        self.shape = (768, 1024, 3)  # Example shape for RGB image
-        self.img_camera = torch.ones(self.shape, dtype=torch.float32)
-        self.img_mask = torch.zeros(self.shape, dtype=torch.float32)
-        self.img_diffusion = torch.full(self.shape, 0.5, dtype=torch.float32)
-        self.img_optical_flow = torch.full(self.shape, 0.5, dtype=torch.float32)
+        self.shape_3 = (768, 1024, 3)  # Example shape for RGB image
+        self.shape_2 = (768, 1024, 2)  # Example shape for RGB image
+        self.img_camera = torch.ones(self.shape_3, dtype=torch.float32)
+        self.img_mask = torch.zeros(self.shape_3, dtype=torch.float32)
+        self.img_diffusion = torch.full(self.shape_3, 0.5, dtype=torch.float32)
+        self.img_optical_flow = torch.full(self.shape_2, 0.5, dtype=torch.float32)
         self.list_dynamic_coef = [0.3, 0.7]  # Two coefficients
         self.processor = TestDynamicModule()
 

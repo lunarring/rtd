@@ -2,6 +2,7 @@
 src/rtd/dynamic_processor/dynamic_module.py
 */logs/*
 backup_dynamic*
+*/dynamic_module.py
 logs/*
 *.py~
 *.swp
