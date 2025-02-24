@@ -1,3 +1,12 @@
+# TODO:
+# prompt blender + prompt list --- PromptProviderTxtFile
+# post effect underlay battery
+# client-server
+# oscillator mods
+# audio-modulation
+# upwad drift of the liquid
+
+
 from rtd.sdxl_turbo.diffusion_engine import DiffusionEngine
 from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
 import lunar_tools as lt
@@ -15,8 +24,8 @@ from rtd.utils.frame_interpolation import AverageFrameInterpolator
 
 
 if __name__ == "__main__":
-    height_diffusion = int((384 + 96)*1.0)  # 12 * (384 + 96) // 8
-    width_diffusion = int((512 + 128)*1.0)  # 12 * (512 + 128) // 8
+    height_diffusion = int((384 + 96)*1.5)  # 12 * (384 + 96) // 8
+    width_diffusion = int((512 + 128)*1.5)  # 12 * (512 + 128) // 8
     height_render = 1080
     width_render = 1920
     n_frame_interpolations: int = 5
@@ -39,7 +48,7 @@ if __name__ == "__main__":
     init_prompt = 'Human figuring painted with the fast DMT splashes of light, colorful traces of light'
     init_prompt = 'Rare colorful flower petals, intricate blue interwoven patterns of exotic flowers'
     # init_prompt = 'Trippy and colorful long neon forest leaves and folliage fractal merging'
-    # init_prompt = 'Dancing people full of glowing neon nerve fibers and filamenets'
+    init_prompt = 'Dancing people full of glowing neon nerve fibers and filamenets'
 
     meta_input = lt.MetaInput()
     de_img = DiffusionEngine(
@@ -70,8 +79,8 @@ if __name__ == "__main__":
         device=device,
     )
     speech_detector = lt.Speech2Text()
-    prompt_provider = PromptProviderMicrophone()
-
+    prompt_provider_microphone = PromptProviderMicrophone()
+    prompt_provider_txt_file = PromptProviderTxtFile('materials/prompts/dancing_fibers.txt')
     opt_flow_estimator = OpticalFlowEstimator(use_ema=False)
 
     posteffect_processor = Posteffect()
@@ -88,7 +97,7 @@ if __name__ == "__main__":
         new_prompt_mic_unmuter = meta_input.get(akai_lpd8="A1", akai_midimix="A3", button_mode="held_down")
         do_dynamic_processor = meta_input.get(akai_lpd8="B0", akai_midimix="B4", button_mode="toggle", val_default=False)
         do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="E3", button_mode="toggle", val_default=True)
-        cycle_prompt = meta_input.get(akai_lpd8="C0", akai_midimix="C3", button_mode="pressed_once")
+        do_cycle_prompt_from_file = meta_input.get(akai_lpd8="C0", akai_midimix="C3", button_mode="pressed_once")
         do_acid_wobblers = meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
         do_infrared_colorize = meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
@@ -101,8 +110,8 @@ if __name__ == "__main__":
         acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.05)
         coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=1.0, val_default=0.05)
         zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="A2", val_min=0.5, val_max=1.5, val_default=1.0)
-        x_shift = int(meta_input.get(akai_lpd8="H0", akai_midimix="H0", val_min=-50, val_max=50, val_default=0))
-        y_shift = int(meta_input.get(akai_lpd8="H1", akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
+        x_shift = int(meta_input.get(akai_midimix="H0", val_min=-50, val_max=50, val_default=0))
+        y_shift = int(meta_input.get(akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
         color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="G0", val_min=0, val_max=1, val_default=0.5)
         optical_flow_low_pass_kernel_size = int(meta_input.get(akai_midimix="B1", val_min=0, val_max=100, val_default=55))
 
@@ -112,21 +121,29 @@ if __name__ == "__main__":
 
         #  postproc control
         do_postproc = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
-        postproc_func_coef1 = meta_input.get(akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
-        postproc_func_coef2 = meta_input.get(akai_midimix="G2", val_min=0, val_max=1, val_default=0.5)
+        postproc_func_coef1 = meta_input.get(akai_lpd8="H0", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
+        postproc_func_coef2 = meta_input.get(akai_lpd8="H1", akai_midimix="G2", val_min=0, val_max=1, val_default=0.5)
         postproc_mod_button1 = meta_input.get(akai_midimix="G4", button_mode="toggle", val_default=True)
 
         do_blur = False
         do_acid_tracers = True
 
-        if do_dynamic_processor:
-            assert not do_compile
+        if do_compile and do_dynamic_processor:
+            print(f'dynamic processor is currently not compatible with compile mode')
+            do_dynamic_processor = False
 
-        new_diffusion_prompt_available = prompt_provider.handle_unmute_button(new_prompt_mic_unmuter)
-        # prompt_provider.handle_prompt_cycling_button(cycle_prompt)
+        new_diffusion_prompt_available_from_mic = prompt_provider_microphone.handle_unmute_button(new_prompt_mic_unmuter)
 
-        if new_diffusion_prompt_available:
-            current_prompt = prompt_provider.get_current_prompt()
+        if new_diffusion_prompt_available_from_mic:
+            current_prompt = prompt_provider_microphone.get_current_prompt()
+            print(f"New prompt: {current_prompt}")
+            if do_diffusion:
+                embeds = em.encode_prompt(current_prompt)
+                de_img.set_embeddings(embeds)
+
+        if do_cycle_prompt_from_file:
+            prompt_provider_txt_file.handle_prompt_cycling_button(do_cycle_prompt_from_file)
+            current_prompt = prompt_provider_txt_file.get_current_prompt()
             print(f"New prompt: {current_prompt}")
             if do_diffusion:
                 embeds = em.encode_prompt(current_prompt)

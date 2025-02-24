@@ -3,18 +3,22 @@ import numpy as np
 import torch.nn.functional as F  # retained for grid_sample and conv2d operations
 import lunar_tools as lt
 from PIL import Image  # added for loading particle image
+import os
+import random
 
 class Posteffect():
     def __init__(self, device='cuda:0', motion_adaptive_blend=True, use_diffusion_field=True, 
-                 enable_recent_motion_color_boost=False, enable_particle_effect=True, particle_image_path=None) -> None:
+                 enable_recent_motion_color_boost=False, enable_particle_effect=True, particle_image_path="materials/images") -> None:
         self.device = device
         self.accumulated_frame = None  # added state to accumulate frames
         self.motion_adaptive_blend = motion_adaptive_blend
         self.use_diffusion_field = use_diffusion_field
         self.enable_recent_motion_color_boost = enable_recent_motion_color_boost
         self.enable_particle_effect = enable_particle_effect  # flag for particle effect
-        self.particle_image_path = "materials/ice.jpg"
-        # self.particle_image_path = particle_image_path  # new file path variable for particle image
+        self.particle_image_path = particle_image_path
+
+        if self.enable_particle_effect:
+            self.load_next_particle_image()
 
         # New attributes for smooth diffusion field interpolation
         self.accumulated_warped_particle = None
@@ -23,6 +27,27 @@ class Posteffect():
         self.diffusion_count = 0  # counts the number of calls for interpolation
         # New attribute for tracking recent motion over the last 30 frames
         self.motion_history = None
+
+    def load_next_particle_image(self):
+        """
+        Loads a random image from the particle_image_path directory and stores it as a tensor.
+        Assumes particle_image_path is a directory containing image files.
+        """
+        # Get list of image files in directory
+        valid_extensions = ('.jpg', '.jpeg', '.png')
+        image_files = [f for f in os.listdir(self.particle_image_path) 
+                      if f.lower().endswith(valid_extensions)]
+        
+        if not image_files:
+            raise ValueError(f"No valid image files found in {self.particle_image_path}")
+            
+        # Select random image file
+        random_image = random.choice(image_files)
+        image_path = os.path.join(self.particle_image_path, random_image)
+        
+        # Load and convert to tensor
+        particle_img_np = np.array(Image.open(image_path)).astype(np.float32)
+        self.current_particle_tensor = torch.tensor(particle_img_np, device=self.device, dtype=torch.float32)
         
     def generate_smooth_random_field(self, height, width):
         """
@@ -192,8 +217,7 @@ class Posteffect():
         # and add the resulting resampled image to the accumulated frame.
         if self.enable_particle_effect and self.particle_image_path is not None and mod_button1:
             # Load the particle image from the specified file path
-            particle_img_np = np.array(Image.open(self.particle_image_path)).astype(np.float32)
-            particle_img = torch.tensor(particle_img_np, device=self.device, dtype=torch.float32)
+            particle_img = self.current_particle_tensor
             # Resize the particle image to match the dimensions of the diffusion image
             particle_img = lt.resize(particle_img[:,:,:3], size=(torch_img_diffusion.shape[0], torch_img_diffusion.shape[1]))
             # Compute the flow for the particles using optical flow modulated by mod_coef2
@@ -219,12 +243,14 @@ class Posteffect():
                 norm_factor = 255.0 if torch.max(output_to_render) > 1.0 else 1.0
                 overall_brightness = torch.clamp(brightness / norm_factor, 0.0, 1.0).item()
 
+                brightness_limiter = 1 / (1 + overall_brightness*0.5)
+
                 #  limiter = mod_coef1 ** 2
                 limiter = mod_coef1
                 if limiter > 0.7:
                     limiter = 0.7
 
-                warped_particle *= limiter
+                warped_particle *= limiter * brightness_limiter
 
             self.accumulated_warped_particle = warped_particle
 

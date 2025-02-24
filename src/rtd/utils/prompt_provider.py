@@ -112,3 +112,9 @@ class PromptProviderTxtFile(PromptProvider):
             self._current_prompt = self.list_prompts[0]
             self.list_prompts.append(self.list_prompts[0])
             self.list_prompts = self.list_prompts[1:]
+
+    def get_current_prompt(self) -> str | bool:
+        """
+        Get the current prompt.
+        """
+        return self._current_prompt

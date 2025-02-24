@@ -1,0 +1,4 @@
+init_prompt = 'Human figuring painted with the fast DMT splashes of light, colorful traces of light'
+init_prompt = 'Rare colorful flower petals, intricate blue interwoven patterns of exotic flowers'
+init_prompt = 'Trippy and colorful long neon forest leaves and folliage fractal merging'
+init_prompt = 'Dancing people full of glowing neon nerve fibers and filamenets'
