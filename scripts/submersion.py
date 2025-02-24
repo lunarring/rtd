@@ -15,8 +15,8 @@ from rtd.utils.frame_interpolation import AverageFrameInterpolator
 
 
 if __name__ == "__main__":
-    height_diffusion = (384 + 96)*1  # 12 * (384 + 96) // 8
-    width_diffusion = (512 + 128)*1  # 12 * (512 + 128) // 8
+    height_diffusion = int((384 + 96)*1.0)  # 12 * (384 + 96) // 8
+    width_diffusion = int((512 + 128)*1.0)  # 12 * (512 + 128) // 8
     height_render = 1080
     width_render = 1920
     n_frame_interpolations: int = 5
@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
     init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
     init_prompt = 'Human figuring painted with the fast DMT splashes of light, colorful traces of light'
-    # init_prompt = 'Rare colorful flower petals, intricate blue interwoven patterns of exotic flowers'
+    init_prompt = 'Rare colorful flower petals, intricate blue interwoven patterns of exotic flowers'
     # init_prompt = 'Trippy and colorful long neon forest leaves and folliage fractal merging'
     # init_prompt = 'Dancing people full of glowing neon nerve fibers and filamenets'
 
@@ -92,7 +92,6 @@ if __name__ == "__main__":
         do_acid_wobblers = meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
         do_infrared_colorize = meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
-        do_postproc = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
 
         dyn_prompt_restore_backup = meta_input.get(akai_midimix="F3", button_mode="released_once")
         dyn_prompt_del_current = meta_input.get(akai_midimix="F4", button_mode="released_once")
@@ -111,8 +110,11 @@ if __name__ == "__main__":
         dynamic_func_coef2 = meta_input.get(akai_midimix="F1", val_min=0, val_max=1, val_default=0.5)
         dynamic_func_coef3 = meta_input.get(akai_midimix="F2", val_min=0, val_max=1, val_default=0.5)
 
+        #  postproc control
+        do_postproc = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
         postproc_func_coef1 = meta_input.get(akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
         postproc_func_coef2 = meta_input.get(akai_midimix="G2", val_min=0, val_max=1, val_default=0.5)
+        postproc_mod_button1 = meta_input.get(akai_midimix="G4", button_mode="toggle", val_default=True)
 
         do_blur = False
         do_acid_tracers = True
@@ -191,11 +193,22 @@ if __name__ == "__main__":
         if do_postproc:
             fps_tracker.start_segment("Postprocessor")
             if opt_flow is not None:
-                img_diffusion = posteffect_processor.process(img_diffusion, 
-                                                        human_seg_mask.astype(np.float32) / 255, opt_flow,
-                                                        postproc_func_coef1, postproc_func_coef2)
+                output_to_render, update_img = posteffect_processor.process(
+                    img_diffusion, 
+                    human_seg_mask.astype(np.float32) / 255, 
+                    opt_flow,
+                    postproc_func_coef1,
+                    postproc_func_coef2,
+                    postproc_mod_button1
+                )
+            else:
+                output_to_render = img_diffusion
+                update_img = img_diffusion
+        else:
+            update_img = img_diffusion
+            output_to_render = img_diffusion
 
-        acid_processor.update(img_diffusion)
+        acid_processor.update(update_img)
 
         fps_tracker.start_segment("Interpolation")
         # interpolated_frames = frame_interpolator.interpolate(img_diffusion)
@@ -203,7 +216,7 @@ if __name__ == "__main__":
         fps_tracker.start_segment("Rendering")
         t_processing = time.time() - t_processing_start
         # for frame in interpolated_frames:
-        renderer.render(img_proc if do_debug_seethrough else img_diffusion)
+        renderer.render(img_proc if do_debug_seethrough else output_to_render)
 
         # Update and display FPS (this will also handle the last segment timing)
         fps_tracker.print_fps()

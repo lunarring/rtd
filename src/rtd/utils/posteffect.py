@@ -2,25 +2,27 @@ import torch
 import numpy as np
 import torch.nn.functional as F  # retained for grid_sample and conv2d operations
 import lunar_tools as lt
+from PIL import Image  # added for loading particle image
 
 class Posteffect():
     def __init__(self, device='cuda:0', motion_adaptive_blend=True, use_diffusion_field=True, 
-                 enable_recent_motion_color_boost=False, enable_particle_effect=False) -> None:
+                 enable_recent_motion_color_boost=False, enable_particle_effect=True, particle_image_path=None) -> None:
         self.device = device
         self.accumulated_frame = None  # added state to accumulate frames
         self.motion_adaptive_blend = motion_adaptive_blend
         self.use_diffusion_field = use_diffusion_field
         self.enable_recent_motion_color_boost = enable_recent_motion_color_boost
-        self.enable_particle_effect = enable_particle_effect  # new flag for particle effect
+        self.enable_particle_effect = enable_particle_effect  # flag for particle effect
+        self.particle_image_path = "materials/ice.jpg"
+        # self.particle_image_path = particle_image_path  # new file path variable for particle image
 
         # New attributes for smooth diffusion field interpolation
+        self.accumulated_warped_particle = None
         self.diffusion_field_prev = None
         self.diffusion_field_next = None
         self.diffusion_count = 0  # counts the number of calls for interpolation
         # New attribute for tracking recent motion over the last 30 frames
         self.motion_history = None
-        # New attribute for the particle layer accumulation
-        self.particle_layer = None
         
     def generate_smooth_random_field(self, height, width):
         """
@@ -99,7 +101,7 @@ class Posteffect():
         return warped_img
 
     def process(self, img_diffusion, img_mask_segmentation, img_optical_flow,
-                mod_coef1, mod_coef2):
+                mod_coef1, mod_coef2, mod_button1):
         # Convert inputs to torch tensors; ensure they are float32 for processing.
         torch_img_diffusion = torch.tensor(np.asarray(img_diffusion), device=self.device, dtype=torch.float32)
         torch_img_mask_segmentation = torch.tensor(np.asarray(img_mask_segmentation), device=self.device, dtype=torch.float32)
@@ -171,7 +173,7 @@ class Posteffect():
             effective_alpha = base_alpha * mod_coef1
         
         # Compute the new accumulated frame with exponential moving average blend.
-        new_accumulated = effective_alpha * torch_img_diffusion + (1 - effective_alpha) * warped_accum
+        output_to_render = effective_alpha * torch_img_diffusion + (1 - effective_alpha) * warped_accum
         
         # Apply color boost in areas with recent motion if the effect is enabled.
         if self.enable_recent_motion_color_boost:
@@ -184,28 +186,55 @@ class Posteffect():
                 mask_expanded = mask.unsqueeze(2)  # expand mask to (H, W, 1)
                 return mask_expanded * boosted + (1 - mask_expanded) * img
 
-            new_accumulated = apply_color_boost(new_accumulated, recent_motion_mask)
+            output_to_render = apply_color_boost(output_to_render, recent_motion_mask)
         
-        # Update particle layer effect if enabled.
-        if self.enable_particle_effect:
-            # Initialize particle layer if not already done.
-            if self.particle_layer is None:
-                self.particle_layer = torch.zeros_like(torch_img_diffusion)
-            # Calculate flow for particles (using the original optical flow modulation without diffusion)
-            particles_flow = torch_img_optical_flow * mod_coef2
-            # Propagate existing particles based on the flow.
-            warped_particles = self.warp_tensor(self.particle_layer, particles_flow)
-            decayed_particles = warped_particles * 0.9  # decay factor to fade particles in the absence of motion
-            # Inject new particles in areas with significant optical flow.
-            injection_mask = (motion_magnitude > 1.0).float().unsqueeze(2)
-            injection = injection_mask * 0.2  # injection strength; adjust as needed
-            injection = injection.expand_as(torch_img_diffusion) * torch.rand_like(torch_img_diffusion)
-            self.particle_layer = decayed_particles + injection
-            # Add the particle layer to the final accumulated frame.
-            new_accumulated = new_accumulated + self.particle_layer*10
+        # New particle effect implementation: load particle image from file, displace it with optical flow,
+        # and add the resulting resampled image to the accumulated frame.
+        if self.enable_particle_effect and self.particle_image_path is not None and mod_button1:
+            # Load the particle image from the specified file path
+            particle_img_np = np.array(Image.open(self.particle_image_path)).astype(np.float32)
+            particle_img = torch.tensor(particle_img_np, device=self.device, dtype=torch.float32)
+            # Resize the particle image to match the dimensions of the diffusion image
+            particle_img = lt.resize(particle_img[:,:,:3], size=(torch_img_diffusion.shape[0], torch_img_diffusion.shape[1]))
+            # Compute the flow for the particles using optical flow modulated by mod_coef2
+            particle_flow = torch_img_optical_flow * mod_coef2
+            if self.accumulated_warped_particle is None:
+                # Resample/displace the particle image using the optical flow
+                warped_particle = self.warp_tensor(particle_img, particle_flow)
+                self.accumulated_warped_particle = warped_particle
+            else:
+                particle_img = self.accumulated_warped_particle * 0.9 + particle_img * 0.1
+                warped_particle = self.warp_tensor(particle_img, particle_flow)
+
+                # Reconstruct the final output image as it will be used:
+                # Apply the same limiter logic to compute a temporary warped_particle
+
+                # Compute a grayscale (luminance) image using standard perceptual weights.
+                grayscale = (0.299 * output_to_render[..., 0] +
+                             0.587 * output_to_render[..., 1] +
+                             0.114 * output_to_render[..., 2])
+                # Estimate overall brightness as the mean intensity.
+                brightness = torch.mean(grayscale)
+                # Determine normalization factor: assume pixel range of [0,255] if max > 1, otherwise [0,1].
+                norm_factor = 255.0 if torch.max(output_to_render) > 1.0 else 1.0
+                overall_brightness = torch.clamp(brightness / norm_factor, 0.0, 1.0).item()
+
+                #  limiter = mod_coef1 ** 2
+                limiter = mod_coef1
+                if limiter > 0.7:
+                    limiter = 0.7
+
+                warped_particle *= limiter
+
+            self.accumulated_warped_particle = warped_particle
+
+            # Add the warped particle image to the accumulated frame
+            output_for_diffusion = output_to_render + warped_particle
+        else:
+            output_for_diffusion = output_to_render
         
         # Update the stored accumulated frame (detached to avoid any gradient backpropagation)
-        self.accumulated_frame = new_accumulated.detach()
+        self.accumulated_frame = output_for_diffusion.detach()
         
         # Return the processed image which has both smooth accumulated effects and fluid flow.
-        return new_accumulated.cpu().numpy()
+        return output_to_render.cpu().numpy(), output_for_diffusion.cpu().numpy()
