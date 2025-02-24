@@ -1,0 +1,211 @@
+import torch
+import numpy as np
+import torch.nn.functional as F  # retained for grid_sample and conv2d operations
+import lunar_tools as lt
+
+class Posteffect():
+    def __init__(self, device='cuda:0', motion_adaptive_blend=True, use_diffusion_field=True, 
+                 enable_recent_motion_color_boost=False, enable_particle_effect=False) -> None:
+        self.device = device
+        self.accumulated_frame = None  # added state to accumulate frames
+        self.motion_adaptive_blend = motion_adaptive_blend
+        self.use_diffusion_field = use_diffusion_field
+        self.enable_recent_motion_color_boost = enable_recent_motion_color_boost
+        self.enable_particle_effect = enable_particle_effect  # new flag for particle effect
+
+        # New attributes for smooth diffusion field interpolation
+        self.diffusion_field_prev = None
+        self.diffusion_field_next = None
+        self.diffusion_count = 0  # counts the number of calls for interpolation
+        # New attribute for tracking recent motion over the last 30 frames
+        self.motion_history = None
+        # New attribute for the particle layer accumulation
+        self.particle_layer = None
+        
+    def generate_smooth_random_field(self, height, width):
+        """
+        Generates a smooth random vector field using gaussian filtering.
+        This implementation replaces the non-existent F.gaussian_blur by applying a
+        gaussian filter via convolution with a custom-built gaussian kernel.
+        """
+        # Generate random vectors
+        torch.manual_seed(np.random.randint(1000))
+        random_field = torch.randn(height, width, 2, device=self.device)
+        
+        # Create a Gaussian kernel for convolution
+        def gaussian_kernel(kernel_size, sigma, device):
+            ax = torch.arange(kernel_size, dtype=torch.float32, device=device) - (kernel_size - 1) / 2.0
+            gauss = torch.exp(-0.5 * (ax / sigma)**2)
+            kernel1d = gauss / gauss.sum()
+            # Create a 2D kernel by outer product
+            kernel2d = torch.outer(kernel1d, kernel1d)
+            # Reshape to (1, 1, kernel_size, kernel_size) for conv2d
+            return kernel2d.unsqueeze(0).unsqueeze(0)
+        
+        kernel_size = 55
+        sigma = 15.0
+        kernel = gaussian_kernel(kernel_size, sigma, self.device)
+        
+        # Helper to apply gaussian blur via convolution on a single channel
+        def apply_gaussian_blur(channel):
+            # channel expected shape: (H, W)
+            channel = channel.unsqueeze(0).unsqueeze(0)  # shape becomes (1, 1, H, W)
+            padding = kernel_size // 2
+            blurred = F.conv2d(channel, kernel, padding=padding)
+            return blurred.squeeze(0).squeeze(0)
+        
+        # Apply gaussian smoothing to each of the two channels separately
+        smoothed_channels = [
+            apply_gaussian_blur(random_field[..., i])
+            for i in range(2)
+        ]
+        smooth_field = torch.stack(smoothed_channels, dim=-1)
+        
+        # Normalize the field magnitude
+        return smooth_field * 30.5  # Scale factor to control diffusion strength
+        
+    def warp_tensor(self, img, flow):
+        """
+        Warps a given image tensor using the provided optical flow.
+        Assumes:
+          - img is a torch.Tensor of shape (H, W, C)
+          - flow is a torch.Tensor with shape (H, W, 2) in pixel displacements.
+        """
+        H, W = img.shape[:2]
+        # Rearrange image to (1, C, H, W) for grid_sample
+        img_batch = img.permute(2, 0, 1).unsqueeze(0)
+        
+        # Create a normalized coordinate grid in the range [-1, 1]
+        grid_y, grid_x = torch.meshgrid(
+            torch.linspace(-1, 1, H, device=self.device),
+            torch.linspace(-1, 1, W, device=self.device),
+            indexing='ij'
+        )
+        grid = torch.stack((grid_x, grid_y), dim=2)  # shape (H, W, 2)
+        
+        # Convert flow from pixel displacement to normalized coordinates.
+        flow_norm_x = flow[..., 0] * (2.0 / (W - 1))
+        flow_norm_y = flow[..., 1] * (2.0 / (H - 1))
+        flow_norm = torch.stack((flow_norm_x, flow_norm_y), dim=2)
+        
+        # Compute the new grid positions by adding the normalized flow
+        grid_warp = grid + flow_norm
+        grid_warp = grid_warp.unsqueeze(0)  # add batch dimension
+        
+        # Warp the image using grid_sample.
+        warped_img = F.grid_sample(img_batch, grid_warp, mode='bilinear', padding_mode='border', align_corners=True)
+        # Return to original shape (H, W, C)
+        warped_img = warped_img.squeeze(0).permute(1, 2, 0)
+        return warped_img
+
+    def process(self, img_diffusion, img_mask_segmentation, img_optical_flow,
+                mod_coef1, mod_coef2):
+        # Convert inputs to torch tensors; ensure they are float32 for processing.
+        torch_img_diffusion = torch.tensor(np.asarray(img_diffusion), device=self.device, dtype=torch.float32)
+        torch_img_mask_segmentation = torch.tensor(np.asarray(img_mask_segmentation), device=self.device, dtype=torch.float32)
+        torch_img_optical_flow = torch.tensor(np.asarray(img_optical_flow), device=self.device, dtype=torch.float32)
+
+        torch_img_mask_segmentation = lt.resize(torch_img_mask_segmentation, size=(torch_img_diffusion.shape[0], torch_img_diffusion.shape[1]))
+        torch_img_optical_flow = lt.resize(torch_img_optical_flow, size=(torch_img_diffusion.shape[0], torch_img_diffusion.shape[1]))
+        
+        # Compute motion magnitude from optical flow for both motion adaptation and color boost.
+        motion_magnitude = torch.sqrt(torch_img_optical_flow[..., 0]**2 + torch_img_optical_flow[..., 1]**2)
+        
+        # Update motion history if color boost effect is enabled.
+        if self.enable_recent_motion_color_boost:
+            wnd = 5.0
+            threshold = 1.0
+            current_motion = (motion_magnitude > threshold).float()
+            if self.motion_history is None:
+                self.motion_history = current_motion * wnd
+            else:
+                self.motion_history = torch.clamp(self.motion_history - 1, min=0)
+                self.motion_history = torch.where(current_motion > 0, torch.full_like(self.motion_history, wnd), self.motion_history)
+            recent_motion_mask = (self.motion_history > 0).float()
+        
+        # Initialize the accumulated frame if not set
+        if self.accumulated_frame is None:
+            self.accumulated_frame = torch_img_diffusion
+
+        # Apply modulation to the optical flow using mod_coef2.
+        modulated_flow = torch_img_optical_flow * mod_coef2 * 5
+        
+        # Add smooth random diffusion field if enabled with interpolation over 20 calls
+        if self.use_diffusion_field:
+            H, W = torch_img_diffusion.shape[0], torch_img_diffusion.shape[1]
+            # Initialize diffusion fields if not already initialized
+            if self.diffusion_field_prev is None or self.diffusion_field_next is None:
+                self.diffusion_field_prev = self.generate_smooth_random_field(H, W)
+                self.diffusion_field_next = self.generate_smooth_random_field(H, W)
+                self.diffusion_count = 0
+            # Compute interpolation ratio
+            ratio = self.diffusion_count / 20.0
+            diffusion_field = (1 - ratio) * self.diffusion_field_prev + ratio * self.diffusion_field_next
+            # Increment call counter and refresh fields every 20 calls
+            self.diffusion_count += 1
+            if self.diffusion_count >= 20:
+                self.diffusion_field_prev = self.diffusion_field_next
+                self.diffusion_field_next = self.generate_smooth_random_field(H, W)
+                self.diffusion_count = 0
+            modulated_flow = modulated_flow + diffusion_field
+        
+        # Warp the previous accumulated frame based on the modulated optical flow.
+        warped_accum = self.warp_tensor(self.accumulated_frame, modulated_flow)
+        
+        # Compute base blend weights: for background (mask==0) use 0.2 and for human (mask==1) use 0.7
+        # This means background will retain 80% of previous frame while human areas update with 70% of new frame
+        base_alpha = (1 - torch_img_mask_segmentation) * 0.2 + torch_img_mask_segmentation * 0.7
+        
+        if self.motion_adaptive_blend:
+            # Use precomputed motion magnitude to calculate average motion.
+            avg_motion = torch.mean(motion_magnitude)
+            
+            # Use a sigmoid-like mapping to [0,1] range with sensitivity controlled by mod_coef1
+            motion_factor = mod_coef1 * 3 * avg_motion.item()
+            motion_factor = np.clip(motion_factor, 0, 1)
+            
+            # Scale base_alpha by motion_factor
+            effective_alpha = base_alpha * motion_factor
+        else:
+            # Original behavior when motion adaptive blend is disabled
+            effective_alpha = base_alpha * mod_coef1
+        
+        # Compute the new accumulated frame with exponential moving average blend.
+        new_accumulated = effective_alpha * torch_img_diffusion + (1 - effective_alpha) * warped_accum
+        
+        # Apply color boost in areas with recent motion if the effect is enabled.
+        if self.enable_recent_motion_color_boost:
+            # Helper function to boost colors: increases brightness and saturation.
+            def apply_color_boost(img, mask, brightness_factor=1.05, saturation_factor=1.05):
+                # img: tensor of shape (H, W, C), mask: tensor of shape (H, W) with values in [0,1]
+                grey = img.mean(dim=2, keepdim=True)
+                saturated = grey + saturation_factor * (img - grey)
+                boosted = saturated * brightness_factor
+                mask_expanded = mask.unsqueeze(2)  # expand mask to (H, W, 1)
+                return mask_expanded * boosted + (1 - mask_expanded) * img
+
+            new_accumulated = apply_color_boost(new_accumulated, recent_motion_mask)
+        
+        # Update particle layer effect if enabled.
+        if self.enable_particle_effect:
+            # Initialize particle layer if not already done.
+            if self.particle_layer is None:
+                self.particle_layer = torch.zeros_like(torch_img_diffusion)
+            # Calculate flow for particles (using the original optical flow modulation without diffusion)
+            particles_flow = torch_img_optical_flow * mod_coef2
+            # Propagate existing particles based on the flow.
+            warped_particles = self.warp_tensor(self.particle_layer, particles_flow)
+            decayed_particles = warped_particles * 0.9  # decay factor to fade particles in the absence of motion
+            # Inject new particles in areas with significant optical flow.
+            injection_mask = (motion_magnitude > 1.0).float().unsqueeze(2)
+            injection = injection_mask * 0.2  # injection strength; adjust as needed
+            injection = injection.expand_as(torch_img_diffusion) * torch.rand_like(torch_img_diffusion)
+            self.particle_layer = decayed_particles + injection
+            # Add the particle layer to the final accumulated frame.
+            new_accumulated = new_accumulated + self.particle_layer*10
+        
+        # Update the stored accumulated frame (detached to avoid any gradient backpropagation)
+        self.accumulated_frame = new_accumulated.detach()
+        
+        # Return the processed image which has both smooth accumulated effects and fluid flow.
+        return new_accumulated.cpu().numpy()

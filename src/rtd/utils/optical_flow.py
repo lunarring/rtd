@@ -20,9 +20,11 @@ class OpticalFlowEstimator:
         div_size (int): The size to which input images are padded for processing.
         prev_img (np.ndarray): The previous image frame for flow calculation.
         flow_history (list): List of previous flow fields for temporal smoothing.
+        use_ema (bool): Whether to use exponential moving average for temporal smoothing.
     """
 
-    def __init__(self, model_path="./checkpoints/fastflownet_ft_mix.pth", div_flow=20.0, div_size=64, return_numpy=True, device="cuda:0"):
+    def __init__(self, model_path="./checkpoints/fastflownet_ft_mix.pth", div_flow=20.0, div_size=64, 
+                 return_numpy=True, device="cuda:0", use_ema=False):
         """
         Initializes the OpticalFlowEstimator with the specified model path, flow division factor,
         division size, and device.
@@ -32,6 +34,8 @@ class OpticalFlowEstimator:
             div_flow (float): Scaling factor for the flow output.
             div_size (int): Size to which input images are padded for processing.
             device (str): Device to run the model on (e.g., 'cuda:0').
+            use_ema (bool): If True, use exponential moving average for temporal smoothing.
+                          If False, use simple averaging (default).
         """
         self.device = torch.device(device)
         self.model = FastFlowNet().to(self.device).eval()
@@ -41,6 +45,7 @@ class OpticalFlowEstimator:
         self.prev_img = None
         self.return_numpy = return_numpy
         self.flow_history = []
+        self.use_ema = use_ema
 
     def centralize(self, img1, img2):
         """
@@ -125,7 +130,16 @@ class OpticalFlowEstimator:
         if len(self.flow_history) > window_length:
             self.flow_history.pop(0)
         if len(self.flow_history) > 1:
-            flow = torch.stack(self.flow_history).mean(dim=0)
+            if self.use_ema:
+                # Apply exponential moving average with a decay factor
+                alpha = 0.2  # Decay factor (adjust as needed)
+                smoothed_flow = self.flow_history[0]
+                for f in self.flow_history[1:]:
+                    smoothed_flow = alpha * f + (1 - alpha) * smoothed_flow
+                flow = smoothed_flow
+            else:
+                # Simple averaging
+                flow = torch.stack(self.flow_history).mean(dim=0)
 
         flow = flow[0].permute(1, 2, 0)
         if self.return_numpy:
@@ -156,7 +170,7 @@ if __name__ == "__main__":
 
         cam_img = cam.get_img()
         cam_img = np.flip(cam_img, axis=1).astype(np.float32)
-        flow = opt_flow_estimator.get_optflow(cam_img.copy(), low_pass_kernel_size=35, window_length=15)
+        flow = opt_flow_estimator.get_optflow(cam_img.copy(), low_pass_kernel_size=35, window_length=45)
 
         if flow is not None:
             # Extract x and y components of flow

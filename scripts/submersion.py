@@ -4,6 +4,7 @@ import lunar_tools as lt
 from rtd.dynamic_processor.processor_dynamic_module import DynamicProcessor
 from rtd.utils.input_image import InputImageProcessor, AcidProcessor
 from rtd.utils.optical_flow import OpticalFlowEstimator
+from rtd.utils.posteffect import Posteffect
 from rtd.utils.prompt_provider import (
     PromptProviderMicrophone,
     PromptProviderTxtFile,
@@ -14,13 +15,13 @@ from rtd.utils.frame_interpolation import AverageFrameInterpolator
 
 
 if __name__ == "__main__":
-    height_diffusion = 384 + 96  # 12 * (384 + 96) // 8
-    width_diffusion = 512 + 128  # 12 * (512 + 128) // 8
+    height_diffusion = (384 + 96)*1  # 12 * (384 + 96) // 8
+    width_diffusion = (512 + 128)*1  # 12 * (512 + 128) // 8
     height_render = 1080
     width_render = 1920
     n_frame_interpolations: int = 5
     shape_hw_cam = (576, 1024)
-    do_compile = False
+    do_compile = True
     do_diffusion = True
     do_fullscreen = True
 
@@ -35,7 +36,10 @@ if __name__ == "__main__":
         device = "cpu"
 
     init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
-    # init_prompt = "Normal naked people"
+    init_prompt = 'Human figuring painted with the fast DMT splashes of light, colorful traces of light'
+    # init_prompt = 'Rare colorful flower petals, intricate blue interwoven patterns of exotic flowers'
+    # init_prompt = 'Trippy and colorful long neon forest leaves and folliage fractal merging'
+    # init_prompt = 'Dancing people full of glowing neon nerve fibers and filamenets'
 
     meta_input = lt.MetaInput()
     de_img = DiffusionEngine(
@@ -68,7 +72,9 @@ if __name__ == "__main__":
     speech_detector = lt.Speech2Text()
     prompt_provider = PromptProviderMicrophone()
 
-    opt_flow_estimator = OpticalFlowEstimator()
+    opt_flow_estimator = OpticalFlowEstimator(use_ema=False)
+
+    posteffect_processor = Posteffect()
 
     # Initialize FPS tracking
     fps_tracker = lt.FPSTracker()
@@ -86,14 +92,15 @@ if __name__ == "__main__":
         do_acid_wobblers = meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
         do_infrared_colorize = meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
+        do_postproc = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
 
         dyn_prompt_restore_backup = meta_input.get(akai_midimix="F3", button_mode="released_once")
         dyn_prompt_del_current = meta_input.get(akai_midimix="F4", button_mode="released_once")
 
         # floats
-        acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.11)
-        acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.11)
-        coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=1.0, val_default=0.15)
+        acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.05)
+        acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.05)
+        coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=1.0, val_default=0.05)
         zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="A2", val_min=0.5, val_max=1.5, val_default=1.0)
         x_shift = int(meta_input.get(akai_lpd8="H0", akai_midimix="H0", val_min=-50, val_max=50, val_default=0))
         y_shift = int(meta_input.get(akai_lpd8="H1", akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
@@ -104,7 +111,10 @@ if __name__ == "__main__":
         dynamic_func_coef2 = meta_input.get(akai_midimix="F1", val_min=0, val_max=1, val_default=0.5)
         dynamic_func_coef3 = meta_input.get(akai_midimix="F2", val_min=0, val_max=1, val_default=0.5)
 
-        do_blur = True
+        postproc_func_coef1 = meta_input.get(akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
+        postproc_func_coef2 = meta_input.get(akai_midimix="G2", val_min=0, val_max=1, val_default=0.5)
+
+        do_blur = False
         do_acid_tracers = True
 
         if do_dynamic_processor:
@@ -123,14 +133,19 @@ if __name__ == "__main__":
         img_cam = cam.get_img()
 
         fps_tracker.start_segment("Optical Flow")
-        opt_flow = opt_flow_estimator.get_optflow(img_cam.copy(), low_pass_kernel_size=optical_flow_low_pass_kernel_size, window_length=15)
+        opt_flow = opt_flow_estimator.get_optflow(img_cam.copy(), 
+                                                  low_pass_kernel_size=optical_flow_low_pass_kernel_size, window_length=55)
 
         fps_tracker.start_segment("Input Image Proc")
         # Start timing image processing
         input_image_processor.set_human_seg(do_human_seg)
+        input_image_processor.set_resizing_factor_humanseg(0.4)
         input_image_processor.set_blur(do_blur)
         input_image_processor.set_infrared_colorize(do_infrared_colorize)
         img_proc, human_seg_mask = input_image_processor.process(img_cam)
+
+        if not do_human_seg:
+            human_seg_mask = np.ones_like(img_proc).astype(np.float32) / 255
 
         new_dynamic_prompt_available = speech_detector.handle_unmute_button(dyn_prompt_mic_unmuter)
 
@@ -142,22 +157,13 @@ if __name__ == "__main__":
                 dynamic_processor.restore_backup()
             if dyn_prompt_del_current:
                 dynamic_processor.delete_current_fn_func()
-            if human_seg_mask is None:
-                img_proc = dynamic_processor.process(
-                    np.flip(img_proc, axis=1).astype(np.float32),
-                    np.ones_like(img_proc).astype(np.float32) / 255,
-                    np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
-                    opt_flow,
-                    dynamic_func_coef1,
-                )
-            else:
-                img_proc = dynamic_processor.process(
-                    np.flip(img_proc, axis=1).astype(np.float32),
-                    human_seg_mask.astype(np.float32) / 255,
-                    np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
-                    opt_flow,
-                    dynamic_func_coef1,
-                )
+            img_proc = dynamic_processor.process(
+                np.flip(img_proc, axis=1).astype(np.float32),
+                human_seg_mask.astype(np.float32) / 255,
+                np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
+                opt_flow,
+                dynamic_func_coef1,
+            )
             img_acid = np.clip(img_proc, 0, 255).astype(np.uint8)
         else:
             fps_tracker.start_segment("Acid Proc")
@@ -180,6 +186,14 @@ if __name__ == "__main__":
 
         fps_tracker.start_segment("Diffusion")
         img_diffusion = np.array(de_img.generate())
+
+        # apply posteffect
+        if do_postproc:
+            fps_tracker.start_segment("Postprocessor")
+            if opt_flow is not None:
+                img_diffusion = posteffect_processor.process(img_diffusion, 
+                                                        human_seg_mask.astype(np.float32) / 255, opt_flow,
+                                                        postproc_func_coef1, postproc_func_coef2)
 
         acid_processor.update(img_diffusion)
 

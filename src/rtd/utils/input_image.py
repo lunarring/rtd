@@ -158,7 +158,8 @@ class InputImageProcessor:
         self.infrared_colorizer = ImageColorizationPipelineHF()
 
         # human body segmentation
-        self.human_seg = HumanSeg(resizing_factor=self.resizing_factor_humanseg, device=device)
+        self.human_seg = HumanSeg(resizing_factor=self.resizing_factor_humanseg, device=device, 
+                                  apply_smoothing=True, gaussian_kernel_size=9, gaussian_sigma=3)
         self.set_blur_size(self.blur_kernel)
 
         self.do_human_seg = do_human_seg
