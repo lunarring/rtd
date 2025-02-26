@@ -1,4 +1,105 @@
-init_prompt = 'Human figuring painted with the fast DMT splashes of light, colorful traces of light'
-init_prompt = 'Rare colorful flower petals, intricate blue interwoven patterns of exotic flowers'
-init_prompt = 'Trippy and colorful long neon forest leaves and folliage fractal merging'
-init_prompt = 'Dancing people full of glowing neon nerve fibers and filamenets'
+Human figuring painted with the fast DMT splashes of light, colorful traces of light
+Rare colorful flower petals, intricate blue interwoven patterns of exotic flowers
+Trippy and colorful long neon forest leaves and folliage fractal merging
+Dancing people full of glowing neon nerve fibers and filamenets
+Glowing digital fire full of glitches and neon matrix powerful fire glow and plasma
+A radiant celestial being dissolving into liquid light streams, glowing with cosmic energy.
+Ethereal smoke tendrils weaving through an infinite neon fractal tunnel.
+A futuristic biomechanical dancer, their body pulsing with luminous plasma veins.
+Ancient mystical symbols etched in shimmering blue liquid gold, dripping with power.
+A cybernetic warrior with glowing energy wings, slicing through a storm of neon fog.
+Transparent jellyfish-like creatures floating in an electric ocean, their tendrils pulsing.
+Fiery plasma rivers cutting through a dark, misty canyon of neon crystals.
+A luminous phoenix made of swirling golden smoke, bursting into a vortex of color.
+Abstract neon waterfalls cascading into infinity, bending and warping spacetime.
+A giant hand made of holographic light, holding a pulsing orb of cosmic energy.
+An ancient shaman surrounded by glowing auroras, their spirit dissolving into the cosmos.
+A forest of bioluminescent trees, their roots glowing like lava beneath the surface.
+A portal made of iridescent energy ribbons, warping reality as it shimmers.
+A liquid glass dragon, its scales reflecting the entire universe.
+A neon-infused hurricane of smoke and lightning, twisting into fractal patterns.
+A powerful sorcerer summoning a storm of glowing arcane glyphs in midair.
+A swarm of ethereal butterflies leaving trails of neon light as they dance.
+A dancer spinning in a vortex of glowing silk ribbons, dissolving into light.
+A divine entity with molten gold veins, their body dripping with celestial energy.
+A mountain erupting with luminescent lava, spilling rivers of neon fire.
+A mirror-like lake reflecting a sky filled with glowing constellations and flowing mist.
+A figure made entirely of swirling, sentient smoke, shifting and glowing.
+A mystical gateway of liquid fire, pulsing with ancient power.
+A cathedral made of pure plasma, its stained glass shifting with neon energy.
+A knight with armor forged from crackling electric storms, lightning arcing around them.
+A cosmic whale made of glowing gas and light, swimming through the universe.
+A samurai whose blade leaves glowing ink trails in the air as they strike.
+A deep-sea abyss filled with bioluminescent creatures, illuminating the darkness.
+A tornado of multicolored fire and liquid metal spiraling into the sky.
+A glowing hand reaching out from a sea of luminous vapor.
+A futuristic city bathed in pulsating neon mist, skyscrapers wrapped in electric veins.
+A glowing fox made of shifting auroras, running through an endless twilight.
+A humanoid figure woven from strands of living electricity, crackling with power.
+A tidal wave of liquid glass and neon colors frozen in time.
+A warrior clad in armor made of shifting holographic plates, energy flowing between them.
+A cosmic eye floating in a sea of liquid light, swirling with celestial energy.
+A labyrinth of smoke and glowing filaments, shifting as if alive.
+A divine dragon of pure flame, its scales shimmering with iridescent light.
+A dancer leaving glowing ink strokes behind them in a gravity-defying performance.
+A mage casting a spell, their hands trailing vibrant neon streaks in the air.
+A temple built from swirling, glowing clouds of pure energy.
+A being made of living lava, moving with a graceful, liquid motion.
+A spaceship leaving behind an intricate fractal trail of neon energy.
+A humanoid figure emerging from a cocoon of glowing threads, reborn in light.
+A river made of molten gold, glowing with supernatural intensity.
+A mechanical serpent coiled in a vortex of digital fire and neon smoke.
+A statue carved from liquid sapphire, glowing with inner celestial energy.
+A warrior dissolving into a burst of floating neon petals, scattering in the wind.
+A storm of translucent, glowing fish swimming through a sea of liquid plasma.
+A shaman summoning a luminous spirit beast from glowing cosmic dust.
+A galaxy made of twisting ribbons of color, flowing like a liquid river.
+A hand dripping with glowing ink, the patterns morphing with each movement.
+A humanoid entity with wings made of pulsating neon filaments.
+A cathedral of smoke and glowing fractals, ever-shifting in shape.
+A futuristic goddess with eyes that radiate infinite swirling colors.
+A portal opening in the sky, spewing glowing liquid energy into reality.
+A titan sculpted from molten crystal, glowing from within.
+A rainforest where every leaf pulses with ethereal neon light.
+A deep chasm filled with shifting, glowing gas, like a sea of trapped auroras.
+A living sculpture made of liquid silver and dancing fire.
+A lightning storm frozen in time, the bolts forming intricate glowing patterns.
+A giant ethereal manta ray gliding through the air, leaving a trail of neon mist.
+A battle between two celestial beings, their strikes forming fractal explosions of light.
+A temple submerged in glowing water, radiating an eerie luminescence.
+A mask carved from living, pulsing liquid gold.
+A vortex of colorful energy collapsing into itself, warping reality.
+A field of flowers that glow like neon stars under a dark sky.
+A sea of flowing liquid crystal, constantly shifting hues.
+A woman dancing in a storm of bioluminescent dust, glowing like a goddess.
+A glowing comet made of liquid fire, streaking across the cosmos.
+A waterfall made of pure light, cascading into a glowing abyss.
+A sword with a blade of shifting neon energy, humming with power.
+A cybernetic angel with radiant metallic wings, hovering in a mist of blue light.
+A city where the buildings are made of glowing, shifting glass.
+A warrior in battle, their body dissolving into glowing particles.
+A mystic forging a blade in a pool of liquid moonlight.
+A desert where the sand glows with soft bioluminescence under the stars.
+A giant jellyfish made of pure energy, floating through the void.
+A monk meditating, surrounded by swirling neon energy threads.
+A spaceship leaving behind a glowing fractal wake in deep space.
+A being made entirely of holographic, refracting light.
+A river of glowing ink flowing through a darkened city.
+A samurai whose armor is infused with neon veins of power.
+A burning phoenix transforming into a nebula of pure energy.
+A cavern where the walls pulse with luminous organic patterns.
+A cosmic storm of liquid gold and violet plasma.
+A neon lotus blooming in a pond of shimmering electric mist.
+A sorceress with hair that turns into flowing waves of pure light.
+A dragon coiling through a sky filled with bioluminescent clouds.
+A warrior frozen in time, shrouded in glowing ethereal smoke.
+A dark ocean filled with shifting, glowing jellyfish spirits.
+A cosmic entity forming from swirling ribbons of light.
+A vortex of infinite glowing fractals spiraling into the unknown.
+A crystal phoenix shattering into glowing embers, reforming in midair.
+A city submerged in a glowing, otherworldly ocean.
+A being made of pure neon smoke, shifting between dimensions.
+A desert storm of liquid fire and glowing dust.
+A celestial knight wielding a plasma sword, glowing like a star.
+A temple rising from a glowing sea of mist.
+A neon serpent weaving through a world of swirling, luminous chaos.

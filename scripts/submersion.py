@@ -1,11 +1,7 @@
 # TODO:
-# prompt blender + prompt list --- PromptProviderTxtFile
-# post effect underlay battery
 # client-server
 # oscillator mods
 # audio-modulation
-# upwad drift of the liquid
-
 
 from rtd.sdxl_turbo.diffusion_engine import DiffusionEngine
 from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
@@ -14,6 +10,7 @@ from rtd.dynamic_processor.processor_dynamic_module import DynamicProcessor
 from rtd.utils.input_image import InputImageProcessor, AcidProcessor
 from rtd.utils.optical_flow import OpticalFlowEstimator
 from rtd.utils.posteffect import Posteffect
+from rtd.utils.audio_detector import AudioDetector
 from rtd.utils.prompt_provider import (
     PromptProviderMicrophone,
     PromptProviderTxtFile,
@@ -24,8 +21,8 @@ from rtd.utils.frame_interpolation import AverageFrameInterpolator
 
 
 if __name__ == "__main__":
-    height_diffusion = int((384 + 96)*1.5)  # 12 * (384 + 96) // 8
-    width_diffusion = int((512 + 128)*1.5)  # 12 * (512 + 128) // 8
+    height_diffusion = int((384 + 96)*1.0)  # 12 * (384 + 96) // 8
+    width_diffusion = int((512 + 128)*1.0)  # 12 * (512 + 128) // 8
     height_render = 1080
     width_render = 1920
     n_frame_interpolations: int = 5
@@ -49,6 +46,7 @@ if __name__ == "__main__":
     init_prompt = 'Rare colorful flower petals, intricate blue interwoven patterns of exotic flowers'
     # init_prompt = 'Trippy and colorful long neon forest leaves and folliage fractal merging'
     init_prompt = 'Dancing people full of glowing neon nerve fibers and filamenets'
+    init_prompt = 'glowing digital fire full of glitches and neon matrix powerful fire glow and plasma'
 
     meta_input = lt.MetaInput()
     de_img = DiffusionEngine(
@@ -85,6 +83,9 @@ if __name__ == "__main__":
 
     posteffect_processor = Posteffect()
 
+    # audio volume level detector
+    audio_detector = AudioDetector()
+
     # Initialize FPS tracking
     fps_tracker = lt.FPSTracker()
 
@@ -101,9 +102,13 @@ if __name__ == "__main__":
         do_acid_wobblers = meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
         do_infrared_colorize = meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
-
+        do_postproc = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
+        do_audio_modulation = meta_input.get(akai_midimix="E4", button_mode="toggle", val_default=False)
+        
         dyn_prompt_restore_backup = meta_input.get(akai_midimix="F3", button_mode="released_once")
         dyn_prompt_del_current = meta_input.get(akai_midimix="F4", button_mode="released_once")
+
+        do_postproc = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
 
         # floats
         acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.05)
@@ -120,10 +125,18 @@ if __name__ == "__main__":
         dynamic_func_coef3 = meta_input.get(akai_midimix="F2", val_min=0, val_max=1, val_default=0.5)
 
         #  postproc control
-        do_postproc = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
         postproc_func_coef1 = meta_input.get(akai_lpd8="H0", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
         postproc_func_coef2 = meta_input.get(akai_lpd8="H1", akai_midimix="G2", val_min=0, val_max=1, val_default=0.5)
         postproc_mod_button1 = meta_input.get(akai_midimix="G4", button_mode="toggle", val_default=True)
+
+        #  sound-based control
+        if do_audio_modulation:
+            sound_volume = audio_detector.get_last_volume()
+            print(f"Sound volume: {sound_volume}")
+            coef_noise = sound_volume
+            if coef_noise < 0.3:
+                coef_noise = 0.05
+            coef_noise = np.clip(coef_noise,0,0.5)
 
         do_blur = False
         do_acid_tracers = True

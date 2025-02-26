@@ -8,7 +8,8 @@ import random
 
 class Posteffect():
     def __init__(self, device='cuda:0', motion_adaptive_blend=True, use_diffusion_field=True, 
-                 enable_recent_motion_color_boost=False, enable_particle_effect=True, particle_image_path="materials/images") -> None:
+                 enable_recent_motion_color_boost=False, enable_particle_effect=True, 
+                 particle_image_path="materials/images", enable_upward_offset=True) -> None:
         self.device = device
         self.accumulated_frame = None  # added state to accumulate frames
         self.motion_adaptive_blend = motion_adaptive_blend
@@ -16,6 +17,7 @@ class Posteffect():
         self.enable_recent_motion_color_boost = enable_recent_motion_color_boost
         self.enable_particle_effect = enable_particle_effect  # flag for particle effect
         self.particle_image_path = particle_image_path
+        self.enable_upward_offset = enable_upward_offset  # flag for applying upward motion offset
 
         if self.enable_particle_effect:
             self.load_next_particle_image()
@@ -135,6 +137,11 @@ class Posteffect():
         torch_img_mask_segmentation = lt.resize(torch_img_mask_segmentation, size=(torch_img_diffusion.shape[0], torch_img_diffusion.shape[1]))
         torch_img_optical_flow = lt.resize(torch_img_optical_flow, size=(torch_img_diffusion.shape[0], torch_img_diffusion.shape[1]))
         
+        # Apply constant upward offset to the Y component of the optical flow if enabled
+        if self.enable_upward_offset:
+            upward_offset = 1.0  # negative value to shift upward
+            torch_img_optical_flow[..., 1] += upward_offset
+        
         # Compute motion magnitude from optical flow for both motion adaptation and color boost.
         motion_magnitude = torch.sqrt(torch_img_optical_flow[..., 0]**2 + torch_img_optical_flow[..., 1]**2)
         
@@ -216,6 +223,10 @@ class Posteffect():
         # New particle effect implementation: load particle image from file, displace it with optical flow,
         # and add the resulting resampled image to the accumulated frame.
         if self.enable_particle_effect and self.particle_image_path is not None and mod_button1:
+
+            if np.random.rand() < 0.002:
+                self.load_next_particle_image()
+
             # Load the particle image from the specified file path
             particle_img = self.current_particle_tensor
             # Resize the particle image to match the dimensions of the diffusion image
