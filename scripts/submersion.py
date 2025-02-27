@@ -133,9 +133,9 @@ if __name__ == "__main__":
         brightness = meta_input.get(akai_midimix="A2", val_min=0.0, val_max=2, val_default=1.0)
         prompt_transition_time = meta_input.get(akai_lpd8="G1", val_min=1, val_max=20, val_default=8.0)
 
-        dynamic_func_coef1 = meta_input.get(akai_midimix="F0", val_min=0, val_max=1, val_default=0.5)
-        dynamic_func_coef2 = meta_input.get(akai_midimix="F1", val_min=0, val_max=1, val_default=0.5)
-        dynamic_func_coef3 = meta_input.get(akai_midimix="F2", val_min=0, val_max=1, val_default=0.5)
+        # dynamic_func_coef1 = meta_input.get(akai_midimix="F0", val_min=0, val_max=1, val_default=0.5)
+        # dynamic_func_coef2 = meta_input.get(akai_midimix="F1", val_min=0, val_max=1, val_default=0.5)
+        # dynamic_func_coef3 = meta_input.get(akai_midimix="F2", val_min=0, val_max=1, val_default=0.5)
 
         #  postproc control
         postproc_func_coef1 = meta_input.get(akai_lpd8="H0", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
@@ -267,7 +267,7 @@ if __name__ == "__main__":
                     np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
                     human_seg_mask.astype(np.float32) / 255,
                     opt_flow,
-                    dynamic_func_coef1,
+                    postproc_func_coef1,
                 )
                 update_img = np.clip(img_proc, 0, 255).astype(np.uint8)
                 output_to_render = update_img
