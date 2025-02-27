@@ -45,7 +45,7 @@ class DynamicProcessor:
 
     def process(self, img_diffusion, img_mask_segmentation, img_optical_flow, dynamic_coef):
         if not os.path.exists(self.fp_func):
-            return img_camera
+            return img_diffusion
         # if list_dynamic_coef is None:
         #     list_dynamic_coef = [0.5]
 
