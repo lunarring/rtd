@@ -32,7 +32,7 @@ if __name__ == "__main__":
     do_compile = True
     do_diffusion = True
     do_fullscreen = True
-    do_enable_dynamic_processor = False
+    do_enable_dynamic_processor = True
 
     device = "cuda:0"
     img_diffusion = None
@@ -160,12 +160,12 @@ if __name__ == "__main__":
         do_blur = False
         do_acid_tracers = True
 
-        if not do_enable_dynamic_processor:
-            do_dynamic_processor = False
+        # if not do_enable_dynamic_processor:
+        #     do_dynamic_processor = False
 
-        if do_compile and do_dynamic_processor:
-            print(f'dynamic processor is currently not compatible with compile mode')
-            do_dynamic_processor = False
+        # if do_compile and do_dynamic_processor:
+        #     print(f'dynamic processor is currently not compatible with compile mode')
+        #     do_dynamic_processor = False
 
         new_diffusion_prompt_available_from_mic = prompt_provider_microphone.handle_unmute_button(new_prompt_mic_unmuter)
 
@@ -228,39 +228,18 @@ if __name__ == "__main__":
         if not do_human_seg:
             human_seg_mask = np.ones_like(img_proc).astype(np.float32) / 255
 
-        if do_enable_dynamic_processor:
-            new_dynamic_prompt_available = speech_detector.handle_unmute_button(dyn_prompt_mic_unmuter)
-
-            if new_dynamic_prompt_available:
-                dynamic_processor.update_protoblock(speech_detector.transcript)
-
-        if do_dynamic_processor and img_diffusion is not None:
-            fps_tracker.start_segment("Dynamic Proc")
-            if dyn_prompt_restore_backup:
-                dynamic_processor.restore_backup()
-            if dyn_prompt_del_current:
-                dynamic_processor.delete_current_fn_func()
-            img_proc = dynamic_processor.process(
-                np.flip(img_proc, axis=1).astype(np.float32),
-                human_seg_mask.astype(np.float32) / 255,
-                np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
-                opt_flow,
-                dynamic_func_coef1,
-            )
-            img_acid = np.clip(img_proc, 0, 255).astype(np.uint8)
-        else:
-            fps_tracker.start_segment("Acid Proc")
-            # Acid
-            acid_processor.set_acid_strength(acid_strength)
-            acid_processor.set_coef_noise(coef_noise)
-            acid_processor.set_acid_tracers(do_acid_tracers)
-            acid_processor.set_acid_strength_foreground(acid_strength_foreground)
-            acid_processor.set_zoom_factor(zoom_factor)
-            acid_processor.set_x_shift(x_shift)
-            acid_processor.set_y_shift(y_shift)
-            acid_processor.set_do_acid_wobblers(do_acid_wobblers)
-            acid_processor.set_color_matching(color_matching)
-            img_acid = acid_processor.process(img_proc, human_seg_mask)
+        fps_tracker.start_segment("Acid Proc")
+        # Acid
+        acid_processor.set_acid_strength(acid_strength)
+        acid_processor.set_coef_noise(coef_noise)
+        acid_processor.set_acid_tracers(do_acid_tracers)
+        acid_processor.set_acid_strength_foreground(acid_strength_foreground)
+        acid_processor.set_zoom_factor(zoom_factor)
+        acid_processor.set_x_shift(x_shift)
+        acid_processor.set_y_shift(y_shift)
+        acid_processor.set_do_acid_wobblers(do_acid_wobblers)
+        acid_processor.set_color_matching(color_matching)
+        img_acid = acid_processor.process(img_proc, human_seg_mask)
 
         # Start timing diffusion
         de_img.set_input_image(img_acid)
@@ -272,20 +251,42 @@ if __name__ == "__main__":
 
         # apply posteffect
         if do_postproc:
-            fps_tracker.start_segment("Postprocessor")
-            if opt_flow is not None:
-                output_to_render, update_img = posteffect_processor.process(
-                    img_diffusion, 
-                    human_seg_mask.astype(np.float32) / 255, 
+            if do_enable_dynamic_processor:
+                new_dynamic_prompt_available = speech_detector.handle_unmute_button(dyn_prompt_mic_unmuter)
+
+                if new_dynamic_prompt_available:
+                    dynamic_processor.update_protoblock(speech_detector.transcript)
+
+            if do_dynamic_processor and img_diffusion is not None:
+                fps_tracker.start_segment("Dynamic Proc")
+                if dyn_prompt_restore_backup:
+                    dynamic_processor.restore_backup()
+                if dyn_prompt_del_current:
+                    dynamic_processor.delete_current_fn_func()
+                img_proc = dynamic_processor.process(
+                    np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
+                    human_seg_mask.astype(np.float32) / 255,
                     opt_flow,
-                    postproc_func_coef1,
-                    postproc_func_coef2,
-                    postproc_mod_button1,
-                    sound_volume
+                    dynamic_func_coef1,
                 )
+                update_img = np.clip(img_proc, 0, 255).astype(np.uint8)
+                output_to_render = update_img
+                
             else:
-                output_to_render = img_diffusion
-                update_img = img_diffusion
+                fps_tracker.start_segment("Postprocessor")
+                if opt_flow is not None:
+                    output_to_render, update_img = posteffect_processor.process(
+                        img_diffusion, 
+                        human_seg_mask.astype(np.float32) / 255, 
+                        opt_flow,
+                        postproc_func_coef1,
+                        postproc_func_coef2,
+                        postproc_mod_button1,
+                        sound_volume
+                    )
+                else:
+                    output_to_render = img_diffusion
+                    update_img = img_diffusion
         else:
             update_img = img_diffusion
             output_to_render = img_diffusion

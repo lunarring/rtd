@@ -10,7 +10,6 @@ class TestDynamicModuleTests(unittest.TestCase):
         # Create sample test data with known shapes and float32 data type
         self.shape_3 = (768, 1024, 3)  # Example shape for RGB image
         self.shape_2 = (768, 1024, 2)  # Example shape for RGB image
-        self.img_camera = torch.ones(self.shape_3, dtype=torch.float32, device="cuda")
         self.img_mask = torch.zeros(self.shape_3, dtype=torch.float32, device="cuda")
         self.img_diffusion = torch.full(self.shape_3, 0.5, dtype=torch.float32, device="cuda")
         self.img_optical_flow = torch.full(self.shape_2, 0.5, dtype=torch.float32, device="cuda")
@@ -19,18 +18,18 @@ class TestDynamicModuleTests(unittest.TestCase):
 
     def test_output_shape(self):
         """Test that output shape matches input shape"""
-        result = self.processor.process(self.img_camera, self.img_mask, self.img_diffusion, self.img_optical_flow, self.dynamic_coef)
-        self.assertEqual(result.shape, self.img_camera.shape)
+        result = self.processor.process(self.img_diffusion, self.img_mask, self.img_optical_flow, self.dynamic_coef)
+        self.assertEqual(result.shape, self.img_diffusion.shape)
 
     def test_data_type(self):
         """Test that output data type is float32"""
-        result = self.processor.process(self.img_camera, self.img_mask, self.img_diffusion, self.img_optical_flow, self.dynamic_coef)
+        result = self.processor.process(self.img_diffusion, self.img_mask, self.img_optical_flow, self.dynamic_coef)
         self.assertEqual(result.dtype, torch.float32)
 
     def test_performance(self):
         """Test that processing time is under 100ms"""
         start_time = time.time()
-        self.processor.process(self.img_camera, self.img_mask, self.img_diffusion, self.img_optical_flow, self.dynamic_coef)
+        result = self.processor.process(self.img_diffusion, self.img_mask, self.img_optical_flow, self.dynamic_coef)
         elapsed_time = (time.time() - start_time) * 1000  # ms
         msg = f"Processing took {elapsed_time:.2f}ms (>100ms)"
         self.assertLess(elapsed_time, 100, msg)
@@ -38,8 +37,7 @@ class TestDynamicModuleTests(unittest.TestCase):
     def test_output_range(self):
         """Test output values are within valid image range [0, 255]."""
         # Test with extreme input values using torch tensors
-        img_camera = torch.rand(self.shape_3, dtype=torch.float32) * 300
-        result = self.processor.process(img_camera, self.img_mask, self.img_diffusion, self.img_optical_flow, self.dynamic_coef)
+        result = self.processor.process(self.img_diffusion, self.img_mask, self.img_optical_flow, self.dynamic_coef)
 
         # Check that all values are within [0, 255]
         msg_low = "Output contains values less than 0"
