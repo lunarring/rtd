@@ -23,8 +23,8 @@ from rtd.utils.frame_interpolation import AverageFrameInterpolator
 
 
 if __name__ == "__main__":
-    height_diffusion = int((384 + 96)*1.0)  # 12 * (384 + 96) // 8
-    width_diffusion = int((512 + 128)*1.0)  # 12 * (512 + 128) // 8
+    height_diffusion = int((384 + 96)*2.0)  # 12 * (384 + 96) // 8
+    width_diffusion = int((512 + 128)*2.0)  # 12 * (512 + 128) // 8
     height_render = 1080
     width_render = 1920
     n_frame_interpolations: int = 5
@@ -63,6 +63,8 @@ if __name__ == "__main__":
     em = EmbeddingsMixer(de_img.pipe)
     if do_diffusion:
         embeds = em.encode_prompt(init_prompt)
+        embeds_source = em.clone_embeddings(embeds)
+        embeds_target = em.clone_embeddings(embeds)
         de_img.set_embeddings(embeds)
     renderer = lt.Renderer(
         width=width_render,
@@ -95,6 +97,9 @@ if __name__ == "__main__":
     # Initialize FPS tracking
     fps_tracker = lt.FPSTracker()
 
+    do_prompt_change = False
+    fract_blend_embeds = 0.0
+
     # Frame interpolator for smooth transitions
     # frame_interpolator = AverageFrameInterpolator(num_frames=n_frame_interpolations)
     while True:
@@ -126,6 +131,7 @@ if __name__ == "__main__":
         y_shift = int(meta_input.get(akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
         color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="G0", val_min=0, val_max=1, val_default=0.5)
         brightness = meta_input.get(akai_midimix="A2", val_min=0.0, val_max=2, val_default=1.0)
+        prompt_transition_time = meta_input.get(akai_lpd8="G1", val_min=1, val_max=20, val_default=8.0)
 
         dynamic_func_coef1 = meta_input.get(akai_midimix="F0", val_min=0, val_max=1, val_default=0.5)
         dynamic_func_coef2 = meta_input.get(akai_midimix="F1", val_min=0, val_max=1, val_default=0.5)
@@ -165,19 +171,45 @@ if __name__ == "__main__":
 
         if new_diffusion_prompt_available_from_mic:
             current_prompt = prompt_provider_microphone.get_current_prompt()
-            print(f"New prompt: {current_prompt}")
-            if do_diffusion:
-                embeds = em.encode_prompt(current_prompt)
-                de_img.set_embeddings(embeds)
+            do_prompt_change = True
+            # print(f"New prompt: {current_prompt}")
+            # if do_diffusion:
+            #     embeds = em.encode_prompt(current_prompt)
+            #     de_img.set_embeddings(embeds)
 
         if do_cycle_prompt_from_file:
             prompt_provider_txt_file.handle_prompt_cycling_button(do_cycle_prompt_from_file)
+            do_prompt_change = True
             current_prompt = prompt_provider_txt_file.get_current_prompt()
+            # print(f"New prompt: {current_prompt}")
+            # if do_diffusion:
+            #     embeds = em.encode_prompt(current_pro
+            # mpt)
+            #     de_img.set_embeddings(embeds)
+        
+        # if we get new prompt: set current embeds as source embeds, get target embeds
+        if do_prompt_change and do_diffusion:
             print(f"New prompt: {current_prompt}")
-            if do_diffusion:
-                embeds = em.encode_prompt(current_prompt)
-                de_img.set_embeddings(embeds)
+            embeds_source = em.clone_embeddings(embeds)
+            embeds_target = em.encode_prompt(current_prompt)
+            do_prompt_change = False
+            # Reset the blend fraction when starting a new transition
+            fract_blend_embeds = 0.0
+            # Store the time when transition started
+            transition_start_time = time.time()
 
+
+        # Calculate the blend fraction based on elapsed time and transition duration
+        if fract_blend_embeds < 1.0:
+            elapsed_time = time.time() - transition_start_time if 'transition_start_time' in locals() else 0
+            # Calculate fraction based on elapsed time and total transition time
+            fract_blend_embeds = min(elapsed_time / prompt_transition_time, 1.0)
+            
+            # Blend embeds based on the calculated fraction
+            embeds = em.blend_two_embeds(embeds_source, embeds_target, fract_blend_embeds)
+            de_img.set_embeddings(embeds)
+
+        # 
         img_cam = cam.get_img()
 
         fps_tracker.start_segment("Optical Flow")
