@@ -4,6 +4,7 @@ import struct
 import time
 import numpy as np
 import sys
+import cv2
 import lunar_tools as lt
 from rtd.utils.prompt_provider import PromptProviderMicrophone, PromptProviderTxtFile
 from rtd.utils.audio_detector import AudioDetector
@@ -33,8 +34,9 @@ class SubmersionServer:
         self.bounce = bounce  # If True, the server will simply echo back the received image without processing
 
         # These dimensions match the submersion pipeline settings.
-        self.height_diffusion = 384 + 96
-        self.width_diffusion = 512 + 128
+        # Updated to match submersion.py resolution
+        self.height_diffusion = int((384 + 96)*1.0)
+        self.width_diffusion = int((512 + 128)*1.0)
 
         # Create and bind the server socket.
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -68,15 +70,25 @@ class SubmersionServer:
                 do_diffusion=self.do_diffusion,
                 device=device,
             )
-            # Optionally, set a default prompt embedding.
+
+            # Initialize embeddings mixer and initial prompt
             if self.do_diffusion:
-                init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
-                em = EmbeddingsMixer(self.de_img.pipe)
-                embeds = em.encode_prompt(init_prompt)
-                self.de_img.set_embeddings(embeds)
+                self.em = EmbeddingsMixer(self.de_img.pipe)
+                init_prompt = 'Dancing people full of glowing neon nerve fibers and filamenets'
+                self.embeds = self.em.encode_prompt(init_prompt)
+                self.embeds_source = self.em.clone_embeddings(self.embeds)
+                self.embeds_target = self.em.clone_embeddings(self.embeds)
+                self.de_img.set_embeddings(self.embeds)
+                self.fract_blend_embeds = 1.0  # Start with fully blended embedding
+                self.transition_start_time = None
 
             # Store the last generated diffusion image (used by dynamic_processor).
             self.last_diffused = None
+
+            # Initialize FPS tracker for server-side performance monitoring
+            self.fps_tracker = lt.FPSTracker()
+
+            print("Submersion server ready.")
         else:
             print("Bounce mode enabled: Server will echo the received image without processing.")
 
@@ -106,129 +118,130 @@ class SubmersionServer:
     def handle_client(self, client_sock, addr):
         print(f"Connected by {addr}")
         while True:
-            # try:
-            data = self.recv_msg(client_sock)
-            if data is None:
-                print("Client disconnected")
-                break
-
-            # Unpickle the received payload (contains processing parameters).
-            payload = pickle.loads(data)
-
-            if not self.bounce:
-                mic_prompt = payload.get("mic_prompt")
-                if mic_prompt:
-                    print(f"New microphone prompt received: {mic_prompt}")
-                    if self.do_diffusion:
-                        em = EmbeddingsMixer(self.de_img.pipe)
-                        embeds = em.encode_prompt(mic_prompt)
-                        self.de_img.set_embeddings(embeds)
-                
-                txt_file_prompt = payload.get("txt_file_prompt")
-                if txt_file_prompt:
-                    print(f"New text file prompt received: {txt_file_prompt}")
-                    if self.do_diffusion:
-                        em = EmbeddingsMixer(self.de_img.pipe)
-                        embeds = em.encode_prompt(txt_file_prompt)
-                        self.de_img.set_embeddings(embeds)
-
-                dynamic_transcript = payload.get("dynamic_transcript")
-                if dynamic_transcript:
-                    print(f"New dynamic transcript received: {dynamic_transcript}")
-                    self.dynamic_processor.update_protoblock(dynamic_transcript)
-                    
-                # Check for dynamic processor control signals
-                dyn_prompt_restore_backup = payload.get("dyn_prompt_restore_backup", False)
-                if dyn_prompt_restore_backup:
-                    self.dynamic_processor.restore_backup()
-                    
-                dyn_prompt_del_current = payload.get("dyn_prompt_del_current", False)
-                if dyn_prompt_del_current:
-                    self.dynamic_processor.delete_current_fn_func()
-
-            if self.bounce:
-                # In bounce mode, receive the compressed image and echo it back.
-                img = recv_compressed(client_sock)
-                if img is None:
+            try:
+                self.fps_tracker.start_segment("Receive Data")
+                data = self.recv_msg(client_sock)
+                if data is None:
+                    print("Client disconnected")
                     break
-                send_compressed(client_sock, img, quality=90)
-                continue
 
-            # Receive the compressed camera image.
-            img_cam = recv_compressed(client_sock)
-            if img_cam is None or not isinstance(img_cam, np.ndarray):
-                print("Invalid image received")
-                continue
+                # Unpickle the received payload (contains processing parameters).
+                payload = pickle.loads(data)
 
-            # Extract processing parameters.
-            do_human_seg = payload.get("do_human_seg", True)
-            acid_strength = payload.get("acid_strength", 0.11)
-            acid_strength_foreground = payload.get("acid_strength_foreground", 0.11)
-            coef_noise = payload.get("coef_noise", 0.15)
-            zoom_factor = payload.get("zoom_factor", 1.0)
-            x_shift = payload.get("x_shift", 0)
-            y_shift = payload.get("y_shift", 0)
-            color_matching = payload.get("color_matching", 0.5)
-            dynamic_func_coef1 = payload.get("dynamic_func_coef1", 0.5)
-            dynamic_func_coef2 = payload.get("dynamic_func_coef2", 0.5)
-            dynamic_func_coef3 = payload.get("dynamic_func_coef3", 0.5)
-            do_dynamic_processor = payload.get("do_dynamic_processor", False)
-            do_blur = payload.get("do_blur", False)
-            do_acid_tracers = payload.get("do_acid_tracers", True)
-            do_acid_wobblers = payload.get("do_acid_wobblers", False)
-            brightness = payload.get("brightness", 1.0)
-            do_infrared_colorize = payload.get("do_infrared_colorize", False)
-            
-            # Postprocessing parameters
-            do_postproc = payload.get("do_postproc", True)
-            postproc_func_coef1 = payload.get("postproc_func_coef1", 0.5)
-            postproc_func_coef2 = payload.get("postproc_func_coef2", 0.5)
-            postproc_mod_button1 = payload.get("postproc_mod_button1", True)
-            sound_volume = payload.get("sound_volume", 0)
+                if not self.bounce:
+                    self.fps_tracker.start_segment("Process Prompts")
+                    # Process microphone and text file prompts
+                    mic_prompt = payload.get("mic_prompt")
+                    if mic_prompt and self.do_diffusion:
+                        print(f"New microphone prompt received: {mic_prompt}")
+                        self.transition_start_time = time.time()
+                        self.embeds_source = self.em.clone_embeddings(self.embeds)
+                        self.embeds_target = self.em.encode_prompt(mic_prompt)
+                        self.fract_blend_embeds = 0.0  # Start transition
+                    
+                    txt_file_prompt = payload.get("txt_file_prompt")
+                    if txt_file_prompt and self.do_diffusion:
+                        print(f"New text file prompt received: {txt_file_prompt}")
+                        self.transition_start_time = time.time()
+                        self.embeds_source = self.em.clone_embeddings(self.embeds)
+                        self.embeds_target = self.em.encode_prompt(txt_file_prompt)
+                        self.fract_blend_embeds = 0.0  # Start transition
+                    
+                    # Get prompt transition time
+                    prompt_transition_time = payload.get("prompt_transition_time", 8.0)
+                    
+                    # Update embedding blend if a transition is in progress
+                    if self.transition_start_time is not None and self.fract_blend_embeds < 1.0:
+                        elapsed_time = time.time() - self.transition_start_time
+                        self.fract_blend_embeds = min(elapsed_time / prompt_transition_time, 1.0)
+                        
+                        # Blend embeddings based on calculated fraction
+                        self.embeds = self.em.blend_two_embeds(
+                            self.embeds_source, 
+                            self.embeds_target, 
+                            self.fract_blend_embeds
+                        )
+                        self.de_img.set_embeddings(self.embeds)
 
-            # Process the received image using InputImageProcessor.
-            self.input_image_processor.set_human_seg(do_human_seg)
-            self.input_image_processor.set_resizing_factor_humanseg(0.4)
-            self.input_image_processor.set_blur(do_blur)
-            self.input_image_processor.set_brightness(brightness)
-            self.input_image_processor.set_infrared_colorize(do_infrared_colorize)
-            img_proc, human_seg_mask = self.input_image_processor.process(img_cam)
-            
-            if not do_human_seg:
-                human_seg_mask = np.ones_like(img_proc).astype(np.float32) / 255
-            
-            # Calculate optical flow for posteffect processing
-            # Ensure consistent dimensions for optical flow processing
-            if not hasattr(self, 'last_img_for_flow') or self.last_img_for_flow is None:
-                self.last_img_for_flow = img_cam.copy()
-            
-            # Ensure both images have the same dimensions
-            if self.last_img_for_flow.shape != img_cam.shape:
-                # Resize the current image to match the dimensions of the last image
-                import cv2
-                img_cam_resized = cv2.resize(img_cam, (self.last_img_for_flow.shape[1], self.last_img_for_flow.shape[0]))
-                opt_flow = self.opt_flow_estimator.get_optflow(img_cam_resized, 
-                                                         low_pass_kernel_size=55, window_length=55)
-            else:
+                    # Process dynamic transcript
+                    dynamic_transcript = payload.get("dynamic_transcript")
+                    if dynamic_transcript:
+                        print(f"New dynamic transcript received: {dynamic_transcript}")
+                        self.dynamic_processor.update_protoblock(dynamic_transcript)
+                        
+                    # Check for dynamic processor control signals
+                    dyn_prompt_restore_backup = payload.get("dyn_prompt_restore_backup", False)
+                    if dyn_prompt_restore_backup:
+                        self.dynamic_processor.restore_backup()
+                        
+                    dyn_prompt_del_current = payload.get("dyn_prompt_del_current", False)
+                    if dyn_prompt_del_current:
+                        self.dynamic_processor.delete_current_fn_func()
+
+                if self.bounce:
+                    # In bounce mode, receive the compressed image and echo it back.
+                    self.fps_tracker.start_segment("Bounce Mode")
+                    img = recv_compressed(client_sock)
+                    if img is None:
+                        break
+                    send_compressed(client_sock, img, quality=90)
+                    continue
+
+                # Receive the compressed camera image.
+                self.fps_tracker.start_segment("Receive Image")
+                img_cam = recv_compressed(client_sock)
+                if img_cam is None or not isinstance(img_cam, np.ndarray):
+                    print("Invalid image received")
+                    continue
+
+                # Extract processing parameters.
+                do_human_seg = payload.get("do_human_seg", True)
+                acid_strength = payload.get("acid_strength", 0.11)
+                acid_strength_foreground = payload.get("acid_strength_foreground", 0.11)
+                coef_noise = payload.get("coef_noise", 0.15)
+                zoom_factor = payload.get("zoom_factor", 1.0)
+                x_shift = payload.get("x_shift", 0)
+                y_shift = payload.get("y_shift", 0)
+                color_matching = payload.get("color_matching", 0.5)
+                dynamic_func_coef1 = payload.get("dynamic_func_coef1", 0.5)
+                dynamic_func_coef2 = payload.get("dynamic_func_coef2", 0.5)
+                dynamic_func_coef3 = payload.get("dynamic_func_coef3", 0.5)
+                do_dynamic_processor = payload.get("do_dynamic_processor", False)
+                do_blur = payload.get("do_blur", False)
+                do_acid_tracers = payload.get("do_acid_tracers", True)
+                do_acid_wobblers = payload.get("do_acid_wobblers", False)
+                brightness = payload.get("brightness", 1.0)
+                do_infrared_colorize = payload.get("do_infrared_colorize", False)
+                
+                # Postprocessing parameters
+                do_postproc = payload.get("do_postproc", True)
+                postproc_func_coef1 = payload.get("postproc_func_coef1", 0.5)
+                postproc_func_coef2 = payload.get("postproc_func_coef2", 0.5)
+                postproc_mod_button1 = payload.get("postproc_mod_button1", True)
+                sound_volume = payload.get("sound_volume", 0)
+
+                # Process the received image using InputImageProcessor.
+                self.fps_tracker.start_segment("Input Image Processing")
+                self.input_image_processor.set_human_seg(do_human_seg)
+                self.input_image_processor.set_resizing_factor_humanseg(0.4)
+                self.input_image_processor.set_blur(do_blur)
+                self.input_image_processor.set_brightness(brightness)
+                self.input_image_processor.set_infrared_colorize(do_infrared_colorize)
+                img_proc, human_seg_mask = self.input_image_processor.process(img_cam.copy())
+                
+                if not do_human_seg:
+                    human_seg_mask = np.ones_like(img_proc).astype(np.float32) / 255
+                
+                # Calculate optical flow for posteffect processing
+                self.fps_tracker.start_segment("Optical Flow")
                 opt_flow = self.opt_flow_estimator.get_optflow(img_cam.copy(), 
-                                                         low_pass_kernel_size=55, window_length=55)
-            
-            # Store current image for next iteration
-            self.last_img_for_flow = img_cam.copy()
+                                                            low_pass_kernel_size=55, window_length=55)
+                
+                # Store current image for next iteration
+                self.last_img_for_flow = img_cam.copy()
 
-            if do_dynamic_processor and self.last_diffused is not None:
-                # If dynamic processing is enabled and a previous diffusion exists,
-                # run the dynamic processor.
-                img_acid = self.dynamic_processor.process(
-                    np.flip(img_proc, axis=1).astype(np.float32),
-                    human_seg_mask.astype(np.float32) / 255,
-                    np.flip(self.last_diffused.astype(np.float32), axis=1).copy(),
-                    opt_flow,
-                    dynamic_func_coef1,
-                )
-                img_acid = np.clip(img_acid, 0, 255).astype(np.uint8)
-            else:
-                # Else, use the acid processor.
+                # Acid processing - this happens regardless of dynamic processor
+                self.fps_tracker.start_segment("Acid Processing")
                 self.acid_processor.set_acid_strength(acid_strength)
                 self.acid_processor.set_coef_noise(coef_noise)
                 self.acid_processor.set_acid_tracers(do_acid_tracers)
@@ -240,45 +253,63 @@ class SubmersionServer:
                 self.acid_processor.set_color_matching(color_matching)
                 img_acid = self.acid_processor.process(img_proc, human_seg_mask)
 
-            # Diffusion processing.
-            self.de_img.set_input_image(img_acid)
-            self.de_img.set_guidance_scale(0.5)
-            self.de_img.set_strength(1 / self.de_img.num_inference_steps + 0.00001)
-            img_diffusion = np.array(self.de_img.generate())
-            
-            # Apply posteffect processing if enabled
-            if do_postproc and opt_flow is not None:
-                output_to_render, update_img = self.posteffect_processor.process(
-                    img_diffusion, 
-                    human_seg_mask.astype(np.float32) / 255, 
-                    opt_flow,
-                    postproc_func_coef1,
-                    postproc_func_coef2,
-                    postproc_mod_button1,
-                    sound_volume
-                )
-            else:
-                output_to_render = img_diffusion
-                update_img = img_diffusion
+                # Diffusion processing.
+                self.fps_tracker.start_segment("Diffusion")
+                self.de_img.set_input_image(img_acid)
+                self.de_img.set_guidance_scale(0.5)
+                self.de_img.set_strength(1 / self.de_img.num_inference_steps + 0.00001)
+                img_diffusion = np.array(self.de_img.generate())
+                
+                # Apply posteffect processing if enabled
+                self.fps_tracker.start_segment("Post Processing")
+                if do_postproc:
+                    if do_dynamic_processor and self.last_diffused is not None:
+                        # Process with dynamic processor (matching submersion.py implementation)
+                        img_proc = self.dynamic_processor.process(
+                            np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
+                            human_seg_mask.astype(np.float32) / 255,
+                            opt_flow,
+                            postproc_func_coef1,
+                        )
+                        update_img = np.clip(img_proc, 0, 255).astype(np.uint8)
+                        output_to_render = update_img
+                    elif opt_flow is not None:
+                        # Process with standard posteffect
+                        output_to_render, update_img = self.posteffect_processor.process(
+                            img_diffusion, 
+                            human_seg_mask.astype(np.float32) / 255, 
+                            opt_flow,
+                            postproc_func_coef1,
+                            postproc_func_coef2,
+                            postproc_mod_button1,
+                            sound_volume
+                        )
+                    else:
+                        output_to_render = img_diffusion
+                        update_img = img_diffusion
+                else:
+                    output_to_render = img_diffusion
+                    update_img = img_diffusion
 
-            # Update acid_processor and store the latest diffusion for potential dynamic processing.
-            self.acid_processor.update(update_img)
-            self.last_diffused = img_diffusion
+                # Update acid_processor and store the latest diffusion for potential dynamic processing.
+                self.acid_processor.update(update_img)
+                self.last_diffused = img_diffusion
 
-            # Send the rendered image back to the client using compression.
-            send_compressed(client_sock, output_to_render, quality=90)
+                # Merge sending the rendered image based on debug mode: only one image is sent.
+                self.fps_tracker.start_segment("Send Result")
+                do_debug_seethrough = payload.get("do_debug_seethrough", False)
+                if do_debug_seethrough:
+                    image_to_send = img_proc
+                else:
+                    image_to_send = output_to_render
+                send_compressed(client_sock, image_to_send, quality=90)
+                
+                # Print performance metrics
+                self.fps_tracker.print_fps()
 
-            # If debug mode is requested, also send the input processed image
-            do_debug_seethrough = payload.get("do_debug_seethrough", False)
-            if do_debug_seethrough:
-                send_compressed(client_sock, img_proc, quality=90)
-            else:
-                # Send a placeholder to maintain protocol consistency
-                send_compressed(client_sock, np.zeros((1, 1, 3), dtype=np.uint8), quality=90)
-
-            # except Exception as e:
-            #     print("Error handling client:", e)
-            #     break
+            except Exception as e:
+                print("Error handling client:", e)
+                break
 
         client_sock.close()
 
@@ -375,6 +406,8 @@ class SubmersionClient:
             do_postproc = self.meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
             do_audio_modulation = self.meta_input.get(akai_midimix="D4", button_mode="toggle", val_default=False)
             do_param_oscillators = self.meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
+
+            use_local_server = self.meta_input.get(akai_midimix="I2", button_mode="toggle", val_default=False)
             
             dyn_prompt_restore_backup = self.meta_input.get(akai_midimix="F3", button_mode="released_once")
             dyn_prompt_del_current = self.meta_input.get(akai_midimix="F4", button_mode="released_once")
@@ -388,6 +421,7 @@ class SubmersionClient:
             y_shift = int(self.meta_input.get(akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
             color_matching = self.meta_input.get(akai_lpd8="G0", akai_midimix="G0", val_min=0, val_max=1, val_default=0.5)
             brightness = self.meta_input.get(akai_midimix="A2", val_min=0.0, val_max=2, val_default=1.0)
+            prompt_transition_time = self.meta_input.get(akai_lpd8="G1", val_min=1, val_max=20, val_default=8.0)
 
             dynamic_func_coef1 = self.meta_input.get(akai_midimix="F0", val_min=0, val_max=1, val_default=0.5)
             dynamic_func_coef2 = self.meta_input.get(akai_midimix="F1", val_min=0, val_max=1, val_default=0.5)
@@ -440,7 +474,7 @@ class SubmersionClient:
             # Acquire the camera image.
             self.fps_tracker.start_segment("Camera Capture")
             img_cam = self.cam.get_img()
-
+            #  img_cam = cv2.imread('materials/ice.jpg')
             # Prepare the payload with processing parameters (exclude raw image).
             payload = {
                 "do_human_seg": do_human_seg,
@@ -471,41 +505,57 @@ class SubmersionClient:
                 "sound_volume": sound_volume,
                 "dyn_prompt_restore_backup": dyn_prompt_restore_backup,
                 "dyn_prompt_del_current": dyn_prompt_del_current,
+                "prompt_transition_time": prompt_transition_time,
             }
 
             try:
                 self.fps_tracker.start_segment("Network Communication")
+                
+                # Check if we need to switch servers based on use_local_server toggle
+                current_server = self.server_host
+                target_server = "localhost" if use_local_server else "10.40.49.214"
+                
+                # If server changed, reconnect to the new server
+                if current_server != target_server:
+                    print(f"Switching server from {current_server} to {target_server}")
+                    # Close existing connection
+                    self.sock.close()
+                    
+                    # Create new socket and connect to the new server
+                    self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                    self.sock.connect((target_server, self.server_port))
+                    self.server_host = target_server
+                    print(f"Connected to server at {self.server_host}:{self.server_port}")
+                
                 # Use highest protocol for faster serialization for parameters.
                 data = pickle.dumps(payload, protocol=pickle.HIGHEST_PROTOCOL)
                 self.send_msg(self.sock, data)
                 # Send the camera image using compression.
+
+                if img_cam.shape[:2] != self.cam.shape_hw:
+                    # Resize image to match the expected camera dimensions (width, height)
+                    desired_width = self.cam.shape_hw[1]
+                    desired_height = self.cam.shape_hw[0]
+                    img_cam = cv2.resize(img_cam, (desired_width, desired_height))
+
                 send_compressed(self.sock, img_cam, quality=90)
 
-                # Wait for the processed diffusion image (received in compressed form).
-                img_diffusion = recv_compressed(self.sock)
-                if img_diffusion is None:
-                    print("Disconnected from server")
-                    break
-                
-                # Wait for debug image if requested
-                debug_img = recv_compressed(self.sock)
-                if debug_img is None:
+                # Wait for the processed image (the server sends either a debug image or a diffusion image based on do_debug_seethrough).
+                processed_image = recv_compressed(self.sock)
+                if processed_image is None:
                     print("Disconnected from server")
                     break
 
                 self.fps_tracker.start_segment("Rendering")
-                # Render the appropriate image based on debug mode
-                if do_debug_seethrough and debug_img.size > 3:  # Check if it's not the placeholder
-                    self.renderer.render(debug_img)
-                else:
-                    self.renderer.render(img_diffusion)
+                self.renderer.render(processed_image)
 
                 t_processing = time.time() - t_processing_start
                 # Update and display FPS (this will handle the last segment timing)
                 self.fps_tracker.print_fps()
             except Exception as e:
                 print("Error during communication with server:", e)
-                break
+                pass
 
         self.sock.close()
 
@@ -525,7 +575,7 @@ if __name__ == "__main__":
 
     if role == "server":
         # To test pure network latency, enable bounce mode by setting bounce=True.
-        server = SubmersionServer(bounce=False)
+        server = SubmersionServer(bounce=False, do_compile=True)
         try:
             server.serve_forever()
         except KeyboardInterrupt:
