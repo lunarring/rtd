@@ -1,7 +1,8 @@
 # TODO:
 # client-server
 # oscillator mods
-# audio-modulation
+#  autoprompt cycler
+#  nomotion detector
 
 from rtd.sdxl_turbo.diffusion_engine import DiffusionEngine
 from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
@@ -11,6 +12,7 @@ from rtd.utils.input_image import InputImageProcessor, AcidProcessor
 from rtd.utils.optical_flow import OpticalFlowEstimator
 from rtd.utils.posteffect import Posteffect
 from rtd.utils.audio_detector import AudioDetector
+from rtd.utils.oscillators import Oscillator
 from rtd.utils.prompt_provider import (
     PromptProviderMicrophone,
     PromptProviderTxtFile,
@@ -30,6 +32,7 @@ if __name__ == "__main__":
     do_compile = True
     do_diffusion = True
     do_fullscreen = True
+    do_enable_dynamic_processor = False
 
     device = "cuda:0"
     img_diffusion = None
@@ -86,6 +89,9 @@ if __name__ == "__main__":
     # audio volume level detector
     audio_detector = AudioDetector()
 
+    # initialize effect value oscillator
+    oscillator = Oscillator()
+
     # Initialize FPS tracking
     fps_tracker = lt.FPSTracker()
 
@@ -94,31 +100,32 @@ if __name__ == "__main__":
     while True:
         t_processing_start = time.time()
         # bools
-        dyn_prompt_mic_unmuter = meta_input.get(akai_lpd8="A0", akai_midimix="B3", button_mode="held_down")
         new_prompt_mic_unmuter = meta_input.get(akai_lpd8="A1", akai_midimix="A3", button_mode="held_down")
+        do_cycle_prompt_from_file = meta_input.get(akai_lpd8="C0", akai_midimix="A4", button_mode="pressed_once")
+        dyn_prompt_mic_unmuter = meta_input.get(akai_lpd8="A0", akai_midimix="B3", button_mode="held_down")
         do_dynamic_processor = meta_input.get(akai_lpd8="B0", akai_midimix="B4", button_mode="toggle", val_default=False)
         do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="E3", button_mode="toggle", val_default=True)
-        do_cycle_prompt_from_file = meta_input.get(akai_lpd8="C0", akai_midimix="C3", button_mode="pressed_once")
         do_acid_wobblers = meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
         do_infrared_colorize = meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
         do_postproc = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
-        do_audio_modulation = meta_input.get(akai_midimix="E4", button_mode="toggle", val_default=False)
+        do_audio_modulation = meta_input.get(akai_midimix="D4", button_mode="toggle", val_default=False)
+        do_param_oscillators = meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
         
         dyn_prompt_restore_backup = meta_input.get(akai_midimix="F3", button_mode="released_once")
         dyn_prompt_del_current = meta_input.get(akai_midimix="F4", button_mode="released_once")
 
-        do_postproc = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
+        do_postproc = meta_input.get(akai_midimix="E4", button_mode="toggle", val_default=True)
 
         # floats
         acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.05)
         acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.05)
-        coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=1.0, val_default=0.05)
-        zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="A2", val_min=0.5, val_max=1.5, val_default=1.0)
+        coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=0.3, val_default=0.05)
+        zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H2", val_min=0.5, val_max=1.5, val_default=1.0)
         x_shift = int(meta_input.get(akai_midimix="H0", val_min=-50, val_max=50, val_default=0))
         y_shift = int(meta_input.get(akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
         color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="G0", val_min=0, val_max=1, val_default=0.5)
-        optical_flow_low_pass_kernel_size = int(meta_input.get(akai_midimix="B1", val_min=0, val_max=100, val_default=55))
+        brightness = meta_input.get(akai_midimix="A2", val_min=0.0, val_max=2, val_default=1.0)
 
         dynamic_func_coef1 = meta_input.get(akai_midimix="F0", val_min=0, val_max=1, val_default=0.5)
         dynamic_func_coef2 = meta_input.get(akai_midimix="F1", val_min=0, val_max=1, val_default=0.5)
@@ -129,17 +136,26 @@ if __name__ == "__main__":
         postproc_func_coef2 = meta_input.get(akai_lpd8="H1", akai_midimix="G2", val_min=0, val_max=1, val_default=0.5)
         postproc_mod_button1 = meta_input.get(akai_midimix="G4", button_mode="toggle", val_default=True)
 
+        #  oscillator-based control
+        if do_param_oscillators:
+            do_cycle_prompt_from_file = oscillator.get('prompt_cycle', 60, 0, 1, 'trigger')
+            acid_strength = oscillator.get('acid_strength', 30, 0, 0.5, 'continuous')
+            coef_noise = oscillator.get('coef_noise', 2, 60, 0.15, 'continuous')
+            postproc_func_coef1 = oscillator.get('postproc_func_coef1', 120, 0.25, 1, 'continuous')
+            postproc_func_coef2 = oscillator.get('postproc_func_coef2', 180, 0, 0.5, 'continuous')
+
         #  sound-based control
         if do_audio_modulation:
             sound_volume = audio_detector.get_last_volume()
-            print(f"Sound volume: {sound_volume}")
-            coef_noise = sound_volume
-            if coef_noise < 0.3:
-                coef_noise = 0.05
-            coef_noise = np.clip(coef_noise,0,0.5)
+            #  print(f"Sound volume: {sound_volume}")
+        else:
+            sound_volume = 0
 
         do_blur = False
         do_acid_tracers = True
+
+        if not do_enable_dynamic_processor:
+            do_dynamic_processor = False
 
         if do_compile and do_dynamic_processor:
             print(f'dynamic processor is currently not compatible with compile mode')
@@ -166,23 +182,26 @@ if __name__ == "__main__":
 
         fps_tracker.start_segment("Optical Flow")
         opt_flow = opt_flow_estimator.get_optflow(img_cam.copy(), 
-                                                  low_pass_kernel_size=optical_flow_low_pass_kernel_size, window_length=55)
+                                                  low_pass_kernel_size=55, window_length=55)
 
         fps_tracker.start_segment("Input Image Proc")
         # Start timing image processing
         input_image_processor.set_human_seg(do_human_seg)
         input_image_processor.set_resizing_factor_humanseg(0.4)
         input_image_processor.set_blur(do_blur)
+        input_image_processor.set_brightness(brightness)
         input_image_processor.set_infrared_colorize(do_infrared_colorize)
         img_proc, human_seg_mask = input_image_processor.process(img_cam)
 
         if not do_human_seg:
             human_seg_mask = np.ones_like(img_proc).astype(np.float32) / 255
 
-        new_dynamic_prompt_available = speech_detector.handle_unmute_button(dyn_prompt_mic_unmuter)
+        if do_enable_dynamic_processor:
+            new_dynamic_prompt_available = speech_detector.handle_unmute_button(dyn_prompt_mic_unmuter)
 
-        if new_dynamic_prompt_available:
-            dynamic_processor.update_protoblock(speech_detector.transcript)
+            if new_dynamic_prompt_available:
+                dynamic_processor.update_protoblock(speech_detector.transcript)
+
         if do_dynamic_processor and img_diffusion is not None:
             fps_tracker.start_segment("Dynamic Proc")
             if dyn_prompt_restore_backup:
@@ -229,7 +248,8 @@ if __name__ == "__main__":
                     opt_flow,
                     postproc_func_coef1,
                     postproc_func_coef2,
-                    postproc_mod_button1
+                    postproc_mod_button1,
+                    sound_volume
                 )
             else:
                 output_to_render = img_diffusion

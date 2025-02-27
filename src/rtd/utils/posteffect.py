@@ -128,7 +128,7 @@ class Posteffect():
         return warped_img
 
     def process(self, img_diffusion, img_mask_segmentation, img_optical_flow,
-                mod_coef1, mod_coef2, mod_button1):
+                mod_coef1, mod_coef2, mod_button1, sound_volume_modulation):
         # Convert inputs to torch tensors; ensure they are float32 for processing.
         torch_img_diffusion = torch.tensor(np.asarray(img_diffusion), device=self.device, dtype=torch.float32)
         torch_img_mask_segmentation = torch.tensor(np.asarray(img_mask_segmentation), device=self.device, dtype=torch.float32)
@@ -272,6 +272,8 @@ class Posteffect():
         
         # Update the stored accumulated frame (detached to avoid any gradient backpropagation)
         self.accumulated_frame = output_for_diffusion.detach()
+
+        output_to_render[:,:,0] *= (1+sound_volume_modulation)
         
         # Return the processed image which has both smooth accumulated effects and fluid flow.
         return output_to_render.cpu().numpy(), output_for_diffusion.cpu().numpy()
