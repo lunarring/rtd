@@ -20,11 +20,25 @@ from rtd.utils.prompt_provider import (
 import time
 import numpy as np
 from rtd.utils.frame_interpolation import AverageFrameInterpolator
+import torch
+
+
+def get_sample_shape_unet(coord, noise_resolution_h, noise_resolution_w):
+    channels = 640 if coord[0] == "e" else 1280 if coord[0] == "b" else 640
+    if coord[0] == "e":
+        coef = float(2 ** int(coord[1]))
+        shape = [1, channels, int(np.ceil(noise_resolution_h / coef)), int(np.ceil(noise_resolution_w / coef))]
+    elif coord[0] == "b":
+        shape = [1, channels, int(np.ceil(noise_resolution_h / 4)), int(np.ceil(noise_resolution_w / 4))]
+    else:
+        coef = float(2 ** (2 - int(coord[1])))
+        shape = [1, channels, int(np.ceil(noise_resolution_h / coef)), int(np.ceil(noise_resolution_w / coef))]
+    return shape
 
 
 if __name__ == "__main__":
-    height_diffusion = int((384 + 96)*1.0)  # 12 * (384 + 96) // 8
-    width_diffusion = int((512 + 128)*1.0)  # 12 * (512 + 128) // 8
+    height_diffusion = int((384 + 96) * 1.0)  # 12 * (384 + 96) // 8
+    width_diffusion = int((512 + 128) * 1.0)  # 12 * (512 + 128) // 8
     height_render = 1080
     width_render = 1920
     n_frame_interpolations: int = 5
@@ -45,11 +59,11 @@ if __name__ == "__main__":
         device = "cpu"
 
     init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
-    init_prompt = 'Human figuring painted with the fast DMT splashes of light, colorful traces of light'
-    init_prompt = 'Rare colorful flower petals, intricate blue interwoven patterns of exotic flowers'
+    init_prompt = "Human figuring painted with the fast DMT splashes of light, colorful traces of light"
+    init_prompt = "Rare colorful flower petals, intricate blue interwoven patterns of exotic flowers"
     # init_prompt = 'Trippy and colorful long neon forest leaves and folliage fractal merging'
-    init_prompt = 'Dancing people full of glowing neon nerve fibers and filamenets'
-    init_prompt = 'glowing digital fire full of glitches and neon matrix powerful fire glow and plasma'
+    init_prompt = "Dancing people full of glowing neon nerve fibers and filamenets"
+    init_prompt = "glowing digital fire full of glitches and neon matrix powerful fire glow and plasma"
 
     meta_input = lt.MetaInput()
     de_img = DiffusionEngine(
@@ -76,6 +90,15 @@ if __name__ == "__main__":
     input_image_processor = InputImageProcessor(device=device)
     input_image_processor.set_flip(do_flip=True, flip_axis=1)
 
+    # Initialize modulations dictionary and noise
+    modulations = {}
+    modulations_noise = {}
+    noise_resolution_h = height_diffusion // 8  # Latent height
+    noise_resolution_w = width_diffusion // 8  # Latent width
+    for layer in ["e0", "e1", "e2", "e3", "b0", "d0", "d1", "d2", "d3"]:
+        shape = get_sample_shape_unet(layer, noise_resolution_h, noise_resolution_w)
+        modulations_noise[layer] = torch.randn(shape, device=device).half()
+
     acid_processor = AcidProcessor(
         height_diffusion=height_diffusion,
         width_diffusion=width_diffusion,
@@ -83,7 +106,7 @@ if __name__ == "__main__":
     )
     speech_detector = lt.Speech2Text()
     prompt_provider_microphone = PromptProviderMicrophone()
-    prompt_provider_txt_file = PromptProviderTxtFile('materials/prompts/dancing_fibers.txt')
+    prompt_provider_txt_file = PromptProviderTxtFile("materials/prompts/clean_prompts.txt")
     opt_flow_estimator = OpticalFlowEstimator(use_ema=False)
 
     posteffect_processor = Posteffect()
@@ -100,15 +123,18 @@ if __name__ == "__main__":
     do_prompt_change = False
     fract_blend_embeds = 0.0
 
-    # Frame interpolator for smooth transitions
-    # frame_interpolator = AverageFrameInterpolator(num_frames=n_frame_interpolations)
     while True:
         t_processing_start = time.time()
         # bools
         new_prompt_mic_unmuter = meta_input.get(akai_lpd8="A1", akai_midimix="A3", button_mode="held_down")
+        prompt_transition_time = meta_input.get(akai_lpd8="G1", akai_midimix="A1", val_min=1, val_max=20, val_default=8.0)
         do_cycle_prompt_from_file = meta_input.get(akai_lpd8="C0", akai_midimix="A4", button_mode="pressed_once")
+
         dyn_prompt_mic_unmuter = meta_input.get(akai_lpd8="A0", akai_midimix="B3", button_mode="held_down")
         do_dynamic_processor = meta_input.get(akai_lpd8="B0", akai_midimix="B4", button_mode="toggle", val_default=False)
+        dyn_prompt_restore_backup = meta_input.get(akai_midimix="F3", button_mode="released_once")
+        dyn_prompt_del_current = meta_input.get(akai_midimix="F4", button_mode="released_once")
+
         do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="E3", button_mode="toggle", val_default=True)
         do_acid_wobblers = meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
         do_infrared_colorize = meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
@@ -116,10 +142,8 @@ if __name__ == "__main__":
         do_postproc = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
         do_audio_modulation = meta_input.get(akai_midimix="D4", button_mode="toggle", val_default=False)
         do_param_oscillators = meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
-        
-        dyn_prompt_restore_backup = meta_input.get(akai_midimix="F3", button_mode="released_once")
-        dyn_prompt_del_current = meta_input.get(akai_midimix="F4", button_mode="released_once")
 
+        do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=True)
         do_postproc = meta_input.get(akai_midimix="E4", button_mode="toggle", val_default=True)
 
         # floats
@@ -130,8 +154,21 @@ if __name__ == "__main__":
         x_shift = int(meta_input.get(akai_midimix="H0", val_min=-50, val_max=50, val_default=0))
         y_shift = int(meta_input.get(akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
         color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="G0", val_min=0, val_max=1, val_default=0.5)
-        brightness = meta_input.get(akai_midimix="A2", val_min=0.0, val_max=2, val_default=1.0)
-        prompt_transition_time = meta_input.get(akai_lpd8="G1", val_min=1, val_max=20, val_default=8.0)
+        brightness = meta_input.get(akai_midimix="A0", val_min=0.0, val_max=2, val_default=1.0)
+
+        # Modulation controls
+        mod_samp = meta_input.get(akai_midimix="F2", val_min=0, val_max=10, val_default=0)
+        mod_emb = meta_input.get(akai_midimix="F1", val_min=1, val_max=10, val_default=2)
+
+        # Set up modulations dictionary
+        modulations["modulations_noise"] = modulations_noise
+        modulations["b0_samp"] = torch.tensor(mod_samp, device=device)
+        modulations["e2_samp"] = torch.tensor(mod_samp, device=device)
+        modulations["b0_emb"] = torch.tensor(mod_emb, device=device)
+        modulations["e2_emb"] = torch.tensor(mod_emb, device=device)
+
+        # Update DiffusionEngine modulations
+        de_img.modulations = modulations
 
         # dynamic_func_coef1 = meta_input.get(akai_midimix="F0", val_min=0, val_max=1, val_default=0.5)
         # dynamic_func_coef2 = meta_input.get(akai_midimix="F1", val_min=0, val_max=1, val_default=0.5)
@@ -144,11 +181,11 @@ if __name__ == "__main__":
 
         #  oscillator-based control
         if do_param_oscillators:
-            do_cycle_prompt_from_file = oscillator.get('prompt_cycle', 60, 0, 1, 'trigger')
-            acid_strength = oscillator.get('acid_strength', 30, 0, 0.5, 'continuous')
-            coef_noise = oscillator.get('coef_noise', 10, 0, 1.15, 'continuous')
-            postproc_func_coef1 = oscillator.get('postproc_func_coef1', 120, 0.25, 1, 'continuous')
-            postproc_func_coef2 = oscillator.get('postproc_func_coef2', 180, 0, 0.5, 'continuous')
+            do_cycle_prompt_from_file = oscillator.get("prompt_cycle", 60, 0, 1, "trigger")
+            acid_strength = oscillator.get("acid_strength", 30, 0, 0.5, "continuous")
+            coef_noise = oscillator.get("coef_noise", 10, 0, 1.15, "continuous")
+            postproc_func_coef1 = oscillator.get("postproc_func_coef1", 120, 0.25, 1, "continuous")
+            postproc_func_coef2 = oscillator.get("postproc_func_coef2", 180, 0, 0.5, "continuous")
 
         #  sound-based control
         if do_audio_modulation:
@@ -186,7 +223,7 @@ if __name__ == "__main__":
             #     embeds = em.encode_prompt(current_pro
             # mpt)
             #     de_img.set_embeddings(embeds)
-        
+
         # if we get new prompt: set current embeds as source embeds, get target embeds
         if do_prompt_change and do_diffusion:
             print(f"New prompt: {current_prompt}")
@@ -198,23 +235,24 @@ if __name__ == "__main__":
             # Store the time when transition started
             transition_start_time = time.time()
 
-
         # Calculate the blend fraction based on elapsed time and transition duration
         if fract_blend_embeds < 1.0:
-            elapsed_time = time.time() - transition_start_time if 'transition_start_time' in locals() else 0
+            elapsed_time = time.time() - transition_start_time if "transition_start_time" in locals() else 0
             # Calculate fraction based on elapsed time and total transition time
             fract_blend_embeds = min(elapsed_time / prompt_transition_time, 1.0)
-            
+
             # Blend embeds based on the calculated fraction
             embeds = em.blend_two_embeds(embeds_source, embeds_target, fract_blend_embeds)
             de_img.set_embeddings(embeds)
 
-        # 
+        #
         img_cam = cam.get_img()
 
         fps_tracker.start_segment("Optical Flow")
-        opt_flow = opt_flow_estimator.get_optflow(img_cam.copy(), 
-                                                  low_pass_kernel_size=55, window_length=55)
+        if do_optical_flow:
+            opt_flow = opt_flow_estimator.get_optflow(img_cam.copy(), low_pass_kernel_size=55, window_length=55)
+        else:
+            opt_flow = None
 
         fps_tracker.start_segment("Input Image Proc")
         # Start timing image processing
@@ -271,18 +309,18 @@ if __name__ == "__main__":
                 )
                 update_img = np.clip(img_proc, 0, 255).astype(np.uint8)
                 output_to_render = update_img
-                
+
             else:
                 fps_tracker.start_segment("Postprocessor")
                 if opt_flow is not None:
                     output_to_render, update_img = posteffect_processor.process(
-                        img_diffusion, 
-                        human_seg_mask.astype(np.float32) / 255, 
+                        img_diffusion,
+                        human_seg_mask.astype(np.float32) / 255,
                         opt_flow,
                         postproc_func_coef1,
                         postproc_func_coef2,
                         postproc_mod_button1,
-                        sound_volume
+                        sound_volume,
                     )
                 else:
                     output_to_render = img_diffusion
