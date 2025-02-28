@@ -101,7 +101,7 @@ class PromptProviderTxtFile(PromptProvider):
         self._current_prompt = self.list_prompts[0]
 
     def load_prompts(self):
-        with open(self._file_path, "r") as file:
+        with open(self._file_path, "r", encoding="utf-8") as file:
             self.list_prompts = file.readlines()
 
     def handle_prompt_cycling_button(self, cycle_prompt_button_state: bool):
