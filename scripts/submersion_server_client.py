@@ -436,7 +436,7 @@ class SubmersionClient:
             if do_param_oscillators:
                 do_cycle_prompt_from_file = self.oscillator.get('prompt_cycle', 60, 0, 1, 'trigger')
                 acid_strength = self.oscillator.get('acid_strength', 30, 0, 0.5, 'continuous')
-                coef_noise = self.oscillator.get('coef_noise', 2, 60, 0.15, 'continuous')
+                coef_noise = self.oscillator.get('coef_noise', 60, 0, 0.15, 'continuous')
                 postproc_func_coef1 = self.oscillator.get('postproc_func_coef1', 120, 0.25, 1, 'continuous')
                 postproc_func_coef2 = self.oscillator.get('postproc_func_coef2', 180, 0, 0.5, 'continuous')
 

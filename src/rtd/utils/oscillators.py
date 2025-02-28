@@ -65,8 +65,6 @@ class Oscillator:
         elapsed_time = current_time - start_time
         phase = (elapsed_time % period) / period
 
-        print(f'phase {phase}')
-        
         if mode == 'continuous':
             # Sine wave oscillation
             amplitude = (max_value - min_value) / 2

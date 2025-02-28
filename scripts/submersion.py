@@ -23,13 +23,13 @@ from rtd.utils.frame_interpolation import AverageFrameInterpolator
 
 
 if __name__ == "__main__":
-    height_diffusion = int((384 + 96)*2.0)  # 12 * (384 + 96) // 8
-    width_diffusion = int((512 + 128)*2.0)  # 12 * (512 + 128) // 8
+    height_diffusion = int((384 + 96)*1.0)  # 12 * (384 + 96) // 8
+    width_diffusion = int((512 + 128)*1.0)  # 12 * (512 + 128) // 8
     height_render = 1080
     width_render = 1920
     n_frame_interpolations: int = 5
     shape_hw_cam = (576, 1024)
-    do_compile = True
+    do_compile = False
     do_diffusion = True
     do_fullscreen = True
     do_enable_dynamic_processor = True
@@ -146,7 +146,7 @@ if __name__ == "__main__":
         if do_param_oscillators:
             do_cycle_prompt_from_file = oscillator.get('prompt_cycle', 60, 0, 1, 'trigger')
             acid_strength = oscillator.get('acid_strength', 30, 0, 0.5, 'continuous')
-            coef_noise = oscillator.get('coef_noise', 2, 60, 0.15, 'continuous')
+            coef_noise = oscillator.get('coef_noise', 10, 0, 1.15, 'continuous')
             postproc_func_coef1 = oscillator.get('postproc_func_coef1', 120, 0.25, 1, 'continuous')
             postproc_func_coef2 = oscillator.get('postproc_func_coef2', 180, 0, 0.5, 'continuous')
 
@@ -223,7 +223,7 @@ if __name__ == "__main__":
         input_image_processor.set_blur(do_blur)
         input_image_processor.set_brightness(brightness)
         input_image_processor.set_infrared_colorize(do_infrared_colorize)
-        img_proc, human_seg_mask = input_image_processor.process(img_cam)
+        img_proc, human_seg_mask = input_image_processor.process(img_cam.copy())
 
         if not do_human_seg:
             human_seg_mask = np.ones_like(img_proc).astype(np.float32) / 255
