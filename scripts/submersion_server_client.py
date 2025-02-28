@@ -35,8 +35,8 @@ class SubmersionServer:
 
         # These dimensions match the submersion pipeline settings.
         # Updated to match submersion.py resolution
-        self.height_diffusion = int((384 + 96)*1.0)
-        self.width_diffusion = int((512 + 128)*1.0)
+        self.height_diffusion = int((384 + 96)*1.5)
+        self.width_diffusion = int((512 + 128)*1.5)
 
         # Create and bind the server socket.
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -45,6 +45,8 @@ class SubmersionServer:
         self.server_socket.bind((self.host, self.port))
         self.server_socket.listen(5)
         print(f"SubmersionServer listening on {self.host}:{self.port}")
+
+        self.fps_tracker = lt.FPSTracker()
 
         if not self.bounce:
             # Initialize image processing modules.
@@ -84,9 +86,6 @@ class SubmersionServer:
 
             # Store the last generated diffusion image (used by dynamic_processor).
             self.last_diffused = None
-
-            # Initialize FPS tracker for server-side performance monitoring
-            self.fps_tracker = lt.FPSTracker()
 
             print("Submersion server ready.")
         else:
