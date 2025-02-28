@@ -23,7 +23,7 @@ def test_latency():
     
     # Run multiple tests for better accuracy
     latencies = []
-    for test in range(5):
+    for test in range(15):
         print(f"Running test {test+1}/5...")
         
         # Display black screen for a moment
@@ -40,7 +40,7 @@ def test_latency():
         cv2.waitKey(1)  # Update the display
         
         # Threshold for detecting significant brightness change (adjust as needed)
-        brightness_threshold = initial_brightness * 1.2
+        brightness_threshold = initial_brightness * 1.1
         
         # Keep checking the camera until we detect the change
         while True:

@@ -43,7 +43,7 @@ if __name__ == "__main__":
     width_render = 1920
     n_frame_interpolations: int = 5
     shape_hw_cam = (576, 1024)
-    do_compile = False
+    do_compile = True
     do_diffusion = True
     do_fullscreen = True
     do_enable_dynamic_processor = True
@@ -58,12 +58,12 @@ if __name__ == "__main__":
     else:
         device = "cpu"
 
-    init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
     init_prompt = "Human figuring painted with the fast DMT splashes of light, colorful traces of light"
     init_prompt = "Rare colorful flower petals, intricate blue interwoven patterns of exotic flowers"
     # init_prompt = 'Trippy and colorful long neon forest leaves and folliage fractal merging'
     init_prompt = "Dancing people full of glowing neon nerve fibers and filamenets"
     init_prompt = "glowing digital fire full of glitches and neon matrix powerful fire glow and plasma"
+    init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
 
     meta_input = lt.MetaInput()
     de_img = DiffusionEngine(
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     )
     speech_detector = lt.Speech2Text()
     prompt_provider_microphone = PromptProviderMicrophone()
-    prompt_provider_txt_file = PromptProviderTxtFile("materials/prompts/clean_prompts.txt")
+    prompt_provider_txt_file = PromptProviderTxtFile("materials/prompts/good_prompts_wl_community.txt")
     opt_flow_estimator = OpticalFlowEstimator(use_ema=False)
 
     posteffect_processor = Posteffect()
@@ -155,10 +155,11 @@ if __name__ == "__main__":
         y_shift = int(meta_input.get(akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
         color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="G0", val_min=0, val_max=1, val_default=0.5)
         brightness = meta_input.get(akai_midimix="A0", val_min=0.0, val_max=2, val_default=1.0)
+        rotation_angle = meta_input.get(akai_midimix="D0", val_min=-30, val_max=30, val_default=0)
 
         # Modulation controls
         mod_samp = meta_input.get(akai_midimix="F2", val_min=0, val_max=10, val_default=0)
-        mod_emb = meta_input.get(akai_midimix="F1", val_min=1, val_max=10, val_default=2)
+        mod_emb = meta_input.get(akai_midimix="F1", val_min=0, val_max=10, val_default=2)
 
         # Set up modulations dictionary
         modulations["modulations_noise"] = modulations_noise
@@ -277,6 +278,7 @@ if __name__ == "__main__":
         acid_processor.set_y_shift(y_shift)
         acid_processor.set_do_acid_wobblers(do_acid_wobblers)
         acid_processor.set_color_matching(color_matching)
+        acid_processor.set_rotation_angle(rotation_angle)
         img_acid = acid_processor.process(img_proc, human_seg_mask)
 
         # Start timing diffusion
@@ -331,7 +333,7 @@ if __name__ == "__main__":
 
         acid_processor.update(update_img)
 
-        fps_tracker.start_segment("Interpolation")
+        # fps_tracker.start_segment("Interpolation")
         # interpolated_frames = frame_interpolator.interpolate(img_diffusion)
 
         fps_tracker.start_segment("Rendering")

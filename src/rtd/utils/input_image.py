@@ -158,8 +158,9 @@ class InputImageProcessor:
         self.infrared_colorizer = ImageColorizationPipelineHF()
 
         # human body segmentation
-        self.human_seg = HumanSeg(resizing_factor=self.resizing_factor_humanseg, device=device, 
-                                  apply_smoothing=True, gaussian_kernel_size=9, gaussian_sigma=3)
+        self.human_seg = HumanSeg(
+            resizing_factor=self.resizing_factor_humanseg, device=device, apply_smoothing=True, gaussian_kernel_size=9, gaussian_sigma=3
+        )
         self.set_blur_size(self.blur_kernel)
 
         self.do_human_seg = do_human_seg
@@ -442,21 +443,31 @@ class AcidProcessor:
             last_diffusion_image_torch = zoom_image_torch(last_diffusion_image_torch, self.zoom_factor)
 
         # rotations
-        if self.rotation_angle != 0:
-            padding = int(last_diffusion_image_torch.shape[1] // (2 * np.sqrt(2)))
+        if abs(self.rotation_angle) > 0:
+            # Calculate padding to prevent cropping
+            max_dim = max(last_diffusion_image_torch.shape[0], last_diffusion_image_torch.shape[1])
+            padding = int(max_dim * (1 - np.cos(np.radians(abs(self.rotation_angle)))))
             padding = (padding, padding)
+
+            # Pad the image
             last_diffusion_image_torch = transforms.Pad(padding=padding, padding_mode="reflect")(
                 last_diffusion_image_torch.permute(2, 0, 1)
             )
+
+            # Rotate using bilinear interpolation
             last_diffusion_image_torch = transforms.functional.rotate(
                 last_diffusion_image_torch,
                 angle=self.rotation_angle,
                 interpolation=transforms.functional.InterpolationMode.BILINEAR,
                 expand=False,
             ).permute(1, 2, 0)
+
+            # Crop back to original size from the center
+            h, w = last_diffusion_image_torch.shape[:2]
+            h_start = (h - height_diffusion) // 2
+            w_start = (w - width_diffusion) // 2
             last_diffusion_image_torch = last_diffusion_image_torch[
-                padding[0] : last_diffusion_image_torch.shape[0] - padding[0],
-                padding[1] : last_diffusion_image_torch.shape[1] - padding[1],
+                h_start : h_start + height_diffusion, w_start : w_start + width_diffusion
             ]
 
         # acid plane translations
@@ -491,7 +502,6 @@ class AcidProcessor:
             torch.manual_seed(420)
             t_rand = (torch.rand(img_input_torch.shape, device=img_input_torch.device)[:, :, 0].unsqueeze(2) - 0.5) * self.coef_noise * 255
             img_input_torch += t_rand
-
         # Apply color matching if enabled
         if self.color_matching > 0.01:
             if human_seg_mask is not None:
