@@ -273,7 +273,7 @@ class Posteffect():
         # Update the stored accumulated frame (detached to avoid any gradient backpropagation)
         self.accumulated_frame = output_for_diffusion.detach()
 
-        output_to_render[:,:,0] *= (1+sound_volume_modulation)
+        output_to_render[:,:,0] *= (1+sound_volume_modulation*0.5)
         
         # Return the processed image which has both smooth accumulated effects and fluid flow.
         return output_to_render.cpu().numpy(), output_for_diffusion.cpu().numpy()

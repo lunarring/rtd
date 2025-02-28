@@ -35,8 +35,8 @@ class SubmersionServer:
 
         # These dimensions match the submersion pipeline settings.
         # Updated to match submersion.py resolution
-        self.height_diffusion = int((384 + 96)*1.5)
-        self.width_diffusion = int((512 + 128)*1.5)
+        self.height_diffusion = int((384 + 96)*1.0)
+        self.width_diffusion = int((512 + 128)*1.0)
 
         # Create and bind the server socket.
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -339,7 +339,7 @@ class SubmersionClient:
         self.renderer = lt.Renderer(
             width=self.width_render,
             height=self.height_render,
-            backend="opencv",
+            backend="pygame",
             do_fullscreen=self.do_fullscreen,
         )
 
@@ -348,7 +348,8 @@ class SubmersionClient:
         self.prompt_provider_microphone = PromptProviderMicrophone()
         
         # Initialize text file prompt provider
-        self.prompt_provider_txt_file = PromptProviderTxtFile('materials/prompts/dancing_fibers.txt')
+        #  self.prompt_provider_txt_file = PromptProviderTxtFile('materials/prompts/dancing_fibers.txt')
+        self.prompt_provider_txt_file = PromptProviderTxtFile('materials/prompts/good_prompts_wl_community.txt')
         
         # Initialize audio detector and oscillator
         self.audio_detector = AudioDetector()
@@ -399,14 +400,14 @@ class SubmersionClient:
             dyn_prompt_mic_unmuter = self.meta_input.get(akai_lpd8="A0", akai_midimix="B3", button_mode="held_down")
             do_dynamic_processor = self.meta_input.get(akai_lpd8="B0", akai_midimix="B4", button_mode="toggle", val_default=False)
             do_human_seg = self.meta_input.get(akai_lpd8="B1", akai_midimix="E3", button_mode="toggle", val_default=True)
-            do_acid_wobblers = self.meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
+            do_acid_wobblers = False
             do_infrared_colorize = self.meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
             do_debug_seethrough = self.meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
             do_postproc = self.meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
             do_audio_modulation = self.meta_input.get(akai_midimix="D4", button_mode="toggle", val_default=False)
             do_param_oscillators = self.meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
 
-            use_local_server = self.meta_input.get(akai_midimix="I2", button_mode="toggle", val_default=False)
+            use_local_server = self.meta_input.get(akai_midimix="I2", button_mode="toggle", val_default=True)
             
             dyn_prompt_restore_backup = self.meta_input.get(akai_midimix="F3", button_mode="released_once")
             dyn_prompt_del_current = self.meta_input.get(akai_midimix="F4", button_mode="released_once")
