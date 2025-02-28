@@ -8,7 +8,8 @@ import random
 
 class Posteffect():
     def __init__(self, device='cuda:0', motion_adaptive_blend=True, use_diffusion_field=True, 
-                 enable_recent_motion_color_boost=False, enable_particle_effect=True, particle_image_path="materials/images") -> None:
+                 enable_recent_motion_color_boost=False, enable_particle_effect=True, 
+                 particle_image_path="materials/images", enable_upward_offset=True) -> None:
         self.device = device
         self.accumulated_frame = None  # added state to accumulate frames
         self.motion_adaptive_blend = motion_adaptive_blend
@@ -16,6 +17,7 @@ class Posteffect():
         self.enable_recent_motion_color_boost = enable_recent_motion_color_boost
         self.enable_particle_effect = enable_particle_effect  # flag for particle effect
         self.particle_image_path = particle_image_path
+        self.enable_upward_offset = enable_upward_offset  # flag for applying upward motion offset
 
         if self.enable_particle_effect:
             self.load_next_particle_image()
@@ -126,7 +128,7 @@ class Posteffect():
         return warped_img
 
     def process(self, img_diffusion, img_mask_segmentation, img_optical_flow,
-                mod_coef1, mod_coef2, mod_button1):
+                mod_coef1, mod_coef2, mod_button1, sound_volume_modulation):
         # Convert inputs to torch tensors; ensure they are float32 for processing.
         torch_img_diffusion = torch.tensor(np.asarray(img_diffusion), device=self.device, dtype=torch.float32)
         torch_img_mask_segmentation = torch.tensor(np.asarray(img_mask_segmentation), device=self.device, dtype=torch.float32)
@@ -134,6 +136,11 @@ class Posteffect():
 
         torch_img_mask_segmentation = lt.resize(torch_img_mask_segmentation, size=(torch_img_diffusion.shape[0], torch_img_diffusion.shape[1]))
         torch_img_optical_flow = lt.resize(torch_img_optical_flow, size=(torch_img_diffusion.shape[0], torch_img_diffusion.shape[1]))
+        
+        # Apply constant upward offset to the Y component of the optical flow if enabled
+        if self.enable_upward_offset:
+            upward_offset = 1.0  # negative value to shift upward
+            torch_img_optical_flow[..., 1] += upward_offset
         
         # Compute motion magnitude from optical flow for both motion adaptation and color boost.
         motion_magnitude = torch.sqrt(torch_img_optical_flow[..., 0]**2 + torch_img_optical_flow[..., 1]**2)
@@ -216,6 +223,10 @@ class Posteffect():
         # New particle effect implementation: load particle image from file, displace it with optical flow,
         # and add the resulting resampled image to the accumulated frame.
         if self.enable_particle_effect and self.particle_image_path is not None and mod_button1:
+
+            if np.random.rand() < 0.002:
+                self.load_next_particle_image()
+
             # Load the particle image from the specified file path
             particle_img = self.current_particle_tensor
             # Resize the particle image to match the dimensions of the diffusion image
@@ -261,6 +272,8 @@ class Posteffect():
         
         # Update the stored accumulated frame (detached to avoid any gradient backpropagation)
         self.accumulated_frame = output_for_diffusion.detach()
+
+        output_to_render[:,:,0] *= (1+sound_volume_modulation*0.5)
         
         # Return the processed image which has both smooth accumulated effects and fluid flow.
         return output_to_render.cpu().numpy(), output_for_diffusion.cpu().numpy()

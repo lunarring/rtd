@@ -185,6 +185,19 @@ class EmbeddingsMixer:
             embeds_mixed = self.blend_multi_embeds(list_embeds, weights_embeds)
         return embeds_mixed
 
+    @torch.no_grad()
+    def clone_embeddings(self, embeds):
+        """
+        Creates a deep copy of embeddings.
+
+        Args:
+            embeds (list): A list of embeddings tensors to clone.
+
+        Returns:
+            list: A new list containing cloned copies of the input embeddings.
+        """
+        return [embed.clone() for embed in embeds]
+
 if __name__ == "__main__":
     from diffusion_engine import DiffusionEngine
 #%%

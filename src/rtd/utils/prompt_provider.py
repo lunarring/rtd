@@ -4,6 +4,7 @@
 from abc import ABC, abstractmethod
 import time
 import lunar_tools as lt
+import random
 
 
 class PromptProvider(ABC):
@@ -106,12 +107,11 @@ class PromptProviderTxtFile(PromptProvider):
 
     def handle_prompt_cycling_button(self, cycle_prompt_button_state: bool):
         """
-        Get the next prompt from the list of prompts and move it to the end.
+        Get a random prompt from the list of prompts.
         """
         if cycle_prompt_button_state:
-            self._current_prompt = self.list_prompts[0]
-            self.list_prompts.append(self.list_prompts[0])
-            self.list_prompts = self.list_prompts[1:]
+            random_index = random.randint(0, len(self.list_prompts) - 1)
+            self._current_prompt = self.list_prompts[random_index]
 
     def get_current_prompt(self) -> str | bool:
         """

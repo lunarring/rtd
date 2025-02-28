@@ -43,19 +43,17 @@ class DynamicProcessor:
 
         self.task_static = f"Write a class that derives from a base class {self.fn_base_class}, from where you also gather insights about the range of the variables. You name the class you create DynamicClass. Critically it has to pass the existing tests in {self.fn_test}. Always make sure to at least pass all the variables that are listed in the base class, particularly the list of dynamic_func_coef. You don't need to implement any further tests than this one."
 
-    def process(self, img_camera, img_mask_segmentation, img_diffusion, img_optical_flow, dynamic_coef):
+    def process(self, img_diffusion, img_mask_segmentation, img_optical_flow, dynamic_coef):
         if not os.path.exists(self.fp_func):
-            return img_camera
+            return img_diffusion
         # if list_dynamic_coef is None:
         #     list_dynamic_coef = [0.5]
 
-        img_camera = torch.tensor(np.asarray(img_camera), device="cuda")
         img_mask_segmentation = torch.tensor(np.asarray(img_mask_segmentation), device="cuda")
         img_mask_segmentation = torch.flip(img_mask_segmentation, dims=[1])
         img_diffusion = torch.tensor(np.asarray(img_diffusion), device="cuda")
         img_optical_flow = torch.tensor(np.asarray(img_optical_flow), device="cuda")
 
-        img_camera = lt.resize(img_camera, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
         img_optical_flow = lt.resize(img_optical_flow, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
         img_mask_segmentation = lt.resize(img_mask_segmentation, size=(img_diffusion.shape[0], img_diffusion.shape[1]))
         # print(f"img_camera.shape: {img_camera.shape}")
@@ -75,13 +73,13 @@ class DynamicProcessor:
                 self._backup_dynamic_class()  # Create backup when module changes
                 print("Dynamic module changed, reloading")
             if self.dynamic_module and self.dynamic_processor:
-                x = self.dynamic_processor.process(img_camera, img_mask_segmentation, img_diffusion, img_optical_flow, dynamic_coef)
+                x = self.dynamic_processor.process(img_diffusion, img_mask_segmentation, img_optical_flow, dynamic_coef)
                 return torch.flip(x, dims=[1]).cpu().numpy()
             else:
                 raise Exception("Dynamic Processor not available")
         except Exception as e:
             print(f"dynamic module reloading failed: {e}")
-            fallback = img_camera.cpu().numpy()
+            fallback = img_diffusion.cpu().numpy()
             if fallback.ndim == 3 and fallback.shape[2] >= 3:
                 h, w, c = fallback.shape
                 stripe_width = max(1, w // 5)
@@ -140,7 +138,7 @@ class DynamicProcessor:
         # Create config override dictionary to disable git and plausibility check
         config_override = {}
         config_override["git"] = {"enabled": False}
-        config_override["general"] = {"plausibility_test": False, "test_path": self.fp_test, "type": "native", "reasoning_effort": "medium"}
+        config_override["general"] = {"plausibility_test": False, "test_path": self.fp_test, "agent_type": "native", "reasoning_effort": "medium"}
 
         # Remove the function file if it exists
         if self.remove_existing_file:
