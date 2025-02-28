@@ -138,7 +138,7 @@ class DynamicProcessor:
         # Create config override dictionary to disable git and plausibility check
         config_override = {}
         config_override["git"] = {"enabled": False}
-        config_override["general"] = {"plausibility_test": False, "test_path": self.fp_test, "type": "native", "reasoning_effort": "medium"}
+        config_override["general"] = {"plausibility_test": False, "test_path": self.fp_test, "agent_type": "native", "reasoning_effort": "medium"}
 
         # Remove the function file if it exists
         if self.remove_existing_file:
