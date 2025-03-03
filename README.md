@@ -1,14 +1,14 @@
 # RTD - Real-time Diffusion
 
-RTD is a real-time audio-visual system that transforms webcam input using distilled stable diffusion models. The system captures people in front of the camera, applies various real-time transformations using AI diffusion models, and renders the results with customizable visual effects.
+RTD employs advanced AI diffusion models to transform live webcam images into immersive visual experiences. The system captures your image in real time and reinterprets it with customizable effects, blending human expression with creative machine artistry.
 
-![Submersion Demo](path/to/demo/image.gif)
+For example, it can power immersive installations like Submersion, which you can explore here: https://www.lunar-ring.ai/submersion/
 
 ## Features
 
 - **Real-time Diffusion**: Transform camera input using SDXL Turbo for smooth, real-time visual effects
 - **Voice-controlled Prompts**: Update the diffusion prompts using microphone input on the fly
-- **MIDI Control**: Use AKAI Midimix or other MIDI controllers to adjust all effects parameters
+- **MIDI Control**: Use AKAI Midimix or other MIDI controllers to adjust effects parameters during runtime
 - **Client-Server Architecture**: Run processing on a separate machine from the capture/display device
 - **Visual Effects**:
   - Acid-like visual trails and tracers
@@ -23,8 +23,8 @@ RTD is a real-time audio-visual system that transforms webcam input using distil
 
 - Python 3.10+
 - CUDA-compatible GPU with at least 8GB VRAM
-- [Optional] AKAI Midimix or other MIDI controller
 - Webcam
+- (Optional) AKAI Midimix or other MIDI controller 
 
 ### Setup
 
@@ -37,11 +37,6 @@ RTD is a real-time audio-visual system that transforms webcam input using distil
 2. Install the package and its dependencies:
    ```bash
    pip install -e .
-   ```
-   
-   Alternatively, you can install directly from the pyproject.toml:
-   ```bash
-   pip install .
    ```
 
    The installation will automatically download the required dependencies including:
@@ -95,7 +90,7 @@ The system offers a rich palette of visual effects:
 ### Control System
 Submersion can be controlled via several methods:
 - **MIDI Controllers**: Parameters can be adjusted in real-time using AKAI Midimix or other MIDI controllers
-- **Voice Control**: New prompts can be injected by speaking into a microphone
+- **Voice Control**: New prompts can be injected by speaking into a microphone. As we are using OpenAI Whisper API, you will need an OPENAI_API_KEY in your environment.
 - **Parameter Oscillators**: Effects can automatically vary over time using built-in oscillators
 - **Audio Reactivity**: Visual parameters can respond to audio input levels
 
@@ -109,9 +104,9 @@ For optimal performance:
 - **[Optional] MIDI Controller**: AKAI Midimix or compatible controller
 - **[Optional] Microphone**: For voice prompt control
 
-## Acknowledgments
+## Contributing
 
-This project incorporates Lunar Tools and TAC packages.
+We appreciate contributions that help improve the project—whether you’re adding features, updating documentation, or fixing bugs. Feel free to submit a pull request or open an issue with your ideas.
 
 ## License
 
