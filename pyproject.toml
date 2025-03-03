@@ -29,7 +29,8 @@ dependencies = [
   "ultralytics",
   "stable-fast==1.0.0",
   "xformers",
-  "openai>=1.0.0"
+  "openai>=1.0.0",
+  "ultralytics"
 ]
 
 [tool.setuptools.packages.find]
