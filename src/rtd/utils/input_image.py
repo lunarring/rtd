@@ -227,7 +227,6 @@ class InputImageProcessor:
         img = img.astype(np.float32)
 
         # if infrared, take mean of RGB channels and place it into red channel
-        # the image can be then color-rotated with hue adjustments to fit the prompt color space
         if self.do_infrared_colorize:
             img = self.infrared_colorizer.process(img)
 
@@ -241,19 +240,20 @@ class InputImageProcessor:
         img = np.clip(img, 0, 255)
         img = img.astype(np.uint8)
 
-        # convert the image to HSV
-        img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype(float)
-        # adjust saturization
-        img_hsv[:, :, 1] *= self.saturization
+        if self.saturization != 1.0 or self.hue_rotation_angle != 0:
+            # convert the image to HSV
+            img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype(float)
+            # adjust saturization
+            img_hsv[:, :, 1] *= self.saturization
 
-        # Rotate the hue
-        # Hue is represented in OpenCV as a value from 0 to 180 instead of 0 to 360...
-        img_hsv[:, :, 0] = (img_hsv[:, :, 0] + (self.hue_rotation_angle / 2)) % 180
+            # Rotate the hue
+            # Hue is represented in OpenCV as a value from 0 to 180 instead of 0 to 360...
+            img_hsv[:, :, 0] = (img_hsv[:, :, 0] + (self.hue_rotation_angle / 2)) % 180
 
-        # clip the values to stay in valid range
-        img_hsv[:, :, 1] = np.clip(img_hsv[:, :, 1], 0, 255)
-        # convert the image back to BGR
-        img = cv2.cvtColor(img_hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+            # clip the values to stay in valid range
+            img_hsv[:, :, 1] = np.clip(img_hsv[:, :, 1], 0, 255)
+            # convert the image back to BGR
+            img = cv2.cvtColor(img_hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
 
         if human_seg_mask is not None:
             human_seg_mask *= 255

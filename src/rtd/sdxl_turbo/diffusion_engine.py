@@ -807,6 +807,21 @@ class DiffusionEngine():
         # assert strength > 1/self.num_inference_steps, "Increase strength!"
         self.strength = float(strength)
 
+    def set_latent_acid_strength(self, latent_acid_strength):
+        """
+        Sets the strength of the latent acid effect.
+        
+        Args:
+            latent_acid_strength (float): A value between 0 and 1 that determines how much the 
+                                         intermediate latents from the previous step influence 
+                                         the current generation. 0 means no influence (standard diffusion),
+                                         1 means maximum influence.
+        """
+        self.latent_acid_strength = float(latent_acid_strength)
+        # Initialize storage for intermediate latents if not already done
+        if not hasattr(self, 'last_intermediate_latent'):
+            self.last_intermediate_latent = None
+
     def init_input_image_noise(self):
         noise_image = np.random.randn(self.height_diffusion, self.width_diffusion, 3)
         noise_image = ((noise_image - noise_image.min()) / (noise_image.max() - noise_image.min()) * 255).astype(np.uint8)
@@ -976,7 +991,33 @@ class DiffusionEngine():
         # Then build the cross_attention_kwargs from the class attributes
         kwargs = self.build_cross_attention_kwargs(kwargs, cross_attention_kwargs_override)
         
+        # Check if we need to handle latent blending
+        if hasattr(self, 'latent_acid_strength') and self.latent_acid_strength > 0 and self.last_intermediate_latent is not None:
+            # If we have a previous latent and latent_acid_strength > 0, use it to influence the starting latent
+            if 'latents' in kwargs:
+                # Blend the current latents with the previous intermediate latents
+                kwargs['latents'] = (1 - self.latent_acid_strength) * kwargs['latents'] + self.latent_acid_strength * self.last_intermediate_latent
+            
+            # Define a callback to capture the intermediate latent after each step
+            intermediate_latent = None
+            
+            def capture_intermediate(step, timestep, latents):
+                nonlocal intermediate_latent
+                # Store the latent at this step
+                intermediate_latent = latents.clone()
+            
+            # Add the callback to kwargs
+            kwargs["callback"] = capture_intermediate
+            kwargs["callback_steps"] = 1  # Call the callback at every step
+        else:
+            intermediate_latent = None
+        
+        # Run the pipeline
         img_diffusion = self.pipe(**kwargs).images[0]
+        
+        # Store the intermediate latent for next time if needed
+        if hasattr(self, 'latent_acid_strength') and self.latent_acid_strength > 0 and intermediate_latent is not None:
+            self.last_intermediate_latent = intermediate_latent
    
         return img_diffusion
     

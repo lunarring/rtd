@@ -86,7 +86,7 @@ if __name__ == "__main__":
         backend="opencv",
         do_fullscreen=do_fullscreen,
     )
-    cam = lt.WebCam(shape_hw=shape_hw_cam)
+    cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3)
     input_image_processor = InputImageProcessor(device=device)
     input_image_processor.set_flip(do_flip=True, flip_axis=1)
 
@@ -123,7 +123,9 @@ if __name__ == "__main__":
     do_prompt_change = False
     fract_blend_embeds = 0.0
 
+    frame_counter = -1
     while True:
+        frame_counter += 1
         t_processing_start = time.time()
         # bools
         new_prompt_mic_unmuter = meta_input.get(akai_lpd8="A1", akai_midimix="A3", button_mode="held_down")
@@ -135,27 +137,28 @@ if __name__ == "__main__":
         dyn_prompt_restore_backup = meta_input.get(akai_midimix="F3", button_mode="released_once")
         dyn_prompt_del_current = meta_input.get(akai_midimix="F4", button_mode="released_once")
 
-        do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="E3", button_mode="toggle", val_default=True)
+        do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="E3", button_mode="toggle", val_default=False)
         do_acid_wobblers = meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
         do_infrared_colorize = meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
-        do_postproc = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
         do_audio_modulation = meta_input.get(akai_midimix="D4", button_mode="toggle", val_default=False)
         do_param_oscillators = meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
 
-        do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=True)
-        do_postproc = meta_input.get(akai_midimix="E4", button_mode="toggle", val_default=True)
+        do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=False)
+        do_postproc = meta_input.get(akai_midimix="E4", button_mode="toggle", val_default=False)
 
         # floats
-        acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.05)
-        acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.05)
-        coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=0.3, val_default=0.05)
+        acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.0)
+        acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.0)
+        coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=0.3, val_default=0.00)
         zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H2", val_min=0.5, val_max=1.5, val_default=1.0)
         x_shift = int(meta_input.get(akai_midimix="H0", val_min=-50, val_max=50, val_default=0))
         y_shift = int(meta_input.get(akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
         color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="G0", val_min=0, val_max=1, val_default=0.5)
         brightness = meta_input.get(akai_midimix="A0", val_min=0.0, val_max=2, val_default=1.0)
         rotation_angle = meta_input.get(akai_midimix="D0", val_min=-30, val_max=30, val_default=0)
+        # Add latent acid strength parameter
+        latent_acid_strength = meta_input.get(akai_midimix="D1", val_min=0, val_max=1.0, val_default=0.0)
 
         # Modulation controls
         mod_samp = meta_input.get(akai_midimix="F2", val_min=0, val_max=10, val_default=0)
@@ -168,6 +171,11 @@ if __name__ == "__main__":
         modulations["b0_emb"] = torch.tensor(mod_emb, device=device)
         modulations["e2_emb"] = torch.tensor(mod_emb, device=device)
 
+        # Update DiffusionEngine parameters
+        de_img.set_strength(acid_strength)
+        # Set latent acid strength
+        de_img.set_latent_acid_strength(latent_acid_strength)
+        
         # Update DiffusionEngine modulations
         de_img.modulations = modulations
 
@@ -247,27 +255,34 @@ if __name__ == "__main__":
             de_img.set_embeddings(embeds)
 
         #
-        img_cam = cam.get_img()
-
-        fps_tracker.start_segment("Optical Flow")
+        # Get camera framerate from the camera thread
+        camera_fps = cam.get_fps()
+        
+        if 1 or frame_counter < 10:
+            img_cam = cam.get_img()
+        else:
+            img_cam = img_cam_last
+        img_cam_last = img_cam.copy()
+    
+        fps_tracker.start_segment("OptFlow")
         if do_optical_flow:
             opt_flow = opt_flow_estimator.get_optflow(img_cam.copy(), low_pass_kernel_size=55, window_length=55)
         else:
             opt_flow = None
 
-        fps_tracker.start_segment("Input Image Proc")
+        fps_tracker.start_segment("InImg")
         # Start timing image processing
         input_image_processor.set_human_seg(do_human_seg)
         input_image_processor.set_resizing_factor_humanseg(0.4)
         input_image_processor.set_blur(do_blur)
         input_image_processor.set_brightness(brightness)
         input_image_processor.set_infrared_colorize(do_infrared_colorize)
-        img_proc, human_seg_mask = input_image_processor.process(img_cam.copy())
+        img_proc, human_seg_mask = input_image_processor.process(img_cam)
 
         if not do_human_seg:
-            human_seg_mask = np.ones_like(img_proc).astype(np.float32) / 255
+            human_seg_mask = np.ones_like(img_proc).astype(np.float32) #/ 255
 
-        fps_tracker.start_segment("Acid Proc")
+        fps_tracker.start_segment("Acid")
         # Acid
         acid_processor.set_acid_strength(acid_strength)
         acid_processor.set_coef_noise(coef_noise)
@@ -286,7 +301,7 @@ if __name__ == "__main__":
         de_img.set_guidance_scale(0.5)
         de_img.set_strength(1 / de_img.num_inference_steps + 0.00001)
 
-        fps_tracker.start_segment("Diffusion")
+        fps_tracker.start_segment("Diffu")
         img_diffusion = np.array(de_img.generate())
 
         # apply posteffect
@@ -313,7 +328,7 @@ if __name__ == "__main__":
                 output_to_render = update_img
 
             else:
-                fps_tracker.start_segment("Postprocessor")
+                fps_tracker.start_segment("Postproc")
                 if opt_flow is not None:
                     output_to_render, update_img = posteffect_processor.process(
                         img_diffusion,
@@ -336,7 +351,7 @@ if __name__ == "__main__":
         # fps_tracker.start_segment("Interpolation")
         # interpolated_frames = frame_interpolator.interpolate(img_diffusion)
 
-        fps_tracker.start_segment("Rendering")
+        fps_tracker.start_segment("Rend")
         t_processing = time.time() - t_processing_start
         # for frame in interpolated_frames:
         renderer.render(img_proc if do_debug_seethrough else output_to_render)
