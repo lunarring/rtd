@@ -166,6 +166,10 @@ class InputImageProcessor:
         self.do_human_seg = do_human_seg
         self.do_infrared_colorize = do_infrared_colorize
         self.do_blur = do_blur
+        self.do_opt_flow_seg = False
+        self.opt_flow_threshold = 0.1
+        self.opt_flow_blur_kernel = (21, 21)
+        self.opt_flow_blur_sigma = 5
         self.flip_axis = None
 
         self.list_history_frames = []
@@ -202,8 +206,35 @@ class InputImageProcessor:
         else:
             self.flip_axis = None
 
+    def set_opt_flow_seg(self, do_opt_flow_seg=True):
+        self.do_opt_flow_seg = do_opt_flow_seg
+
+    def set_opt_flow_threshold(self, threshold=1):
+        self.opt_flow_threshold = threshold
+
+    def create_opt_flow_mask(self, opt_flow):
+        """Create a mask from optical flow data."""
+        if opt_flow is None:
+            return None
+
+        # Calculate magnitude of optical flow
+        flow_x = opt_flow[..., 0]
+        flow_y = opt_flow[..., 1]
+        magnitude = np.sqrt(flow_x**2 + flow_y**2)
+        # Normalize and threshold to create mask
+        # magnitude = cv2.normalize(magnitude, None, 0, 1, cv2.NORM_MINMAX)
+
+        # Apply threshold to create binary mask
+        opt_flow_mask = (magnitude > self.opt_flow_threshold).astype(np.float32)
+
+        # Flip the mask horizontally to match the camera orientation
+        opt_flow_mask = np.flip(opt_flow_mask, axis=1)
+
+        # Return single-channel mask (will convert to 3-channel later if needed)
+        return opt_flow_mask
+
     # @exception_handler
-    def process(self, img):
+    def process(self, img, opt_flow=None):
         if isinstance(img, torch.Tensor):
             img = img.squeeze(0)
             img = img.cpu().numpy()
@@ -216,12 +247,45 @@ class InputImageProcessor:
             img_torch = torch.from_numpy(img.copy()).to(self.device).float()
             img = self.blur(img_torch.permute([2, 0, 1])[None])[0].permute([1, 2, 0]).cpu().numpy()
 
-        # human body segmentation mask
+        # Create masks
+        human_seg_mask = None
+        opt_flow_mask = None
+        final_mask = None
+
+        # Get human segmentation mask if enabled
         if self.do_human_seg:
             human_seg_mask = self.human_seg.get_mask(img)
-            img = self.human_seg.apply_mask(img)
-        else:
-            human_seg_mask = None
+
+        # Get optical flow mask if enabled
+        if self.do_opt_flow_seg and opt_flow is not None:
+            opt_flow_mask = self.create_opt_flow_mask(opt_flow)
+
+        # Combine masks if both exist
+        if human_seg_mask is not None and opt_flow_mask is not None:
+            final_mask = np.maximum(human_seg_mask, opt_flow_mask)
+        elif human_seg_mask is not None:
+            final_mask = human_seg_mask
+        elif opt_flow_mask is not None:
+            final_mask = opt_flow_mask
+
+        # Apply the final mask if it exists
+        if final_mask is not None:
+            # Apply the mask to the image
+            # Use human_seg's apply_mask if available, otherwise apply manually
+            if self.do_human_seg:
+                self.human_seg.mask = final_mask
+                img = self.human_seg.apply_mask(img)
+            else:
+                # Manual mask application - multiply image by mask
+                # Ensure mask has correct shape for broadcasting (H,W,1)
+                expanded_mask = np.expand_dims(final_mask, axis=2)
+                img = img.astype(np.float32) * expanded_mask
+                img = img.astype(np.uint8)
+
+            # Convert mask to 3-channel format for return value
+            human_seg_mask = final_mask * 255
+            human_seg_mask = np.repeat(np.expand_dims(human_seg_mask, 2), 3, axis=2)
+            human_seg_mask = human_seg_mask.astype(np.uint8)
 
         # adjust brightness
         img = img.astype(np.float32)
@@ -254,11 +318,6 @@ class InputImageProcessor:
             img_hsv[:, :, 1] = np.clip(img_hsv[:, :, 1], 0, 255)
             # convert the image back to BGR
             img = cv2.cvtColor(img_hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
-
-        if human_seg_mask is not None:
-            human_seg_mask *= 255
-            human_seg_mask = np.repeat(np.expand_dims(human_seg_mask, 2), 3, axis=2)
-            human_seg_mask = human_seg_mask.astype(np.uint8)
 
         return img, human_seg_mask
 

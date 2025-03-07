@@ -1,7 +1,9 @@
 # TODO:
 # possibly short term
+
+# - @alex, why this line? human_seg_mask = final_mask * 255
 # - AR knob
-# - optical flow mask
+# - @alex review and improve optical flow mask
 # - optical flow acid
 # - reconfigure akai midimix (use sliders)
 # - investigate better noise
@@ -15,6 +17,7 @@
 # - understand mem acid better
 # - smooth continuation mode
 # - objects floating around or being interactive
+# - display prompts option
 
 # long term
 # - parallelization and stitching
@@ -41,6 +44,7 @@ import time
 import numpy as np
 from rtd.utils.frame_interpolation import AverageFrameInterpolator
 import torch
+import cv2
 
 
 def get_sample_shape_unet(coord, noise_resolution_h, noise_resolution_w):
@@ -57,8 +61,8 @@ def get_sample_shape_unet(coord, noise_resolution_h, noise_resolution_w):
 
 
 if __name__ == "__main__":
-    height_diffusion = int((384 + 96) * 1.0)  # 12 * (384 + 96) // 8
-    width_diffusion = int((512 + 128) * 1.0)  # 12 * (512 + 128) // 8
+    height_diffusion = int((384 + 96) * 1.5)  # 12 * (384 + 96) // 8
+    width_diffusion = int((512 + 128) * 1.5)  # 12 * (512 + 128) // 8
     height_render = 1080
     width_render = 1920
     n_frame_interpolations: int = 5
@@ -163,13 +167,15 @@ if __name__ == "__main__":
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
         do_audio_modulation = meta_input.get(akai_midimix="D4", button_mode="toggle", val_default=False)
         do_param_oscillators = meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
+        do_opt_flow_seg = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
 
-        do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=False)
+        do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=True)
         do_postproc = meta_input.get(akai_midimix="E4", button_mode="toggle", val_default=False)
 
         # floats
         acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.0)
         acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.0)
+        opt_flow_threshold = meta_input.get(akai_lpd8="E2", akai_midimix="E2", val_min=0, val_max=2, val_default=1)
         coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=0.3, val_default=0.00)
         zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H2", val_min=0.5, val_max=1.5, val_default=1.0)
         x_shift = int(meta_input.get(akai_midimix="H0", val_min=-50, val_max=50, val_default=0))
@@ -293,13 +299,15 @@ if __name__ == "__main__":
         fps_tracker.start_segment("InImg")
         # Start timing image processing
         input_image_processor.set_human_seg(do_human_seg)
+        input_image_processor.set_opt_flow_seg(do_opt_flow_seg)
         input_image_processor.set_resizing_factor_humanseg(0.4)
         input_image_processor.set_blur(do_blur)
         input_image_processor.set_brightness(brightness)
         input_image_processor.set_infrared_colorize(do_infrared_colorize)
-        img_proc, human_seg_mask = input_image_processor.process(img_cam)
+        input_image_processor.set_opt_flow_threshold(opt_flow_threshold)
+        img_proc, human_seg_mask = input_image_processor.process(img_cam, opt_flow)
 
-        if not do_human_seg:
+        if not do_human_seg and not do_opt_flow_seg:
             human_seg_mask = np.ones_like(img_proc).astype(np.float32)  # / 255
 
         fps_tracker.start_segment("Acid")
