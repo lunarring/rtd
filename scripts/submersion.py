@@ -1,8 +1,28 @@
 # TODO:
-# client-server
-# oscillator mods
-#  autoprompt cycler
-#  nomotion detector
+# possibly short term
+# - AR knob
+# - optical flow mask
+# - optical flow acid
+# - reconfigure akai midimix (use sliders)
+# - investigate better noise
+#   - noise measurement (experiments)
+#   - noise reduction:
+#     - median (blur)
+#     - kalman filter
+#     - other filters (using optflow?)?
+#     - denoising
+# - automatic prompt injection
+# - understand mem acid better
+# - smooth continuation mode
+# - objects floating around or being interactive
+
+# long term
+# - parallelization and stitching
+# - image to guiding prompt (engagement with image)
+# -
+
+# done (review)
+# - smooth prompt blending A -> B
 
 from rtd.sdxl_turbo.diffusion_engine import DiffusionEngine
 from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
@@ -175,7 +195,7 @@ if __name__ == "__main__":
         de_img.set_strength(acid_strength)
         # Set latent acid strength
         de_img.set_latent_acid_strength(latent_acid_strength)
-        
+
         # Update DiffusionEngine modulations
         de_img.modulations = modulations
 
@@ -257,13 +277,13 @@ if __name__ == "__main__":
         #
         # Get camera framerate from the camera thread
         camera_fps = cam.get_fps()
-        
+
         if 1 or frame_counter < 10:
             img_cam = cam.get_img()
         else:
             img_cam = img_cam_last
         img_cam_last = img_cam.copy()
-    
+
         fps_tracker.start_segment("OptFlow")
         if do_optical_flow:
             opt_flow = opt_flow_estimator.get_optflow(img_cam.copy(), low_pass_kernel_size=55, window_length=55)
@@ -280,7 +300,7 @@ if __name__ == "__main__":
         img_proc, human_seg_mask = input_image_processor.process(img_cam)
 
         if not do_human_seg:
-            human_seg_mask = np.ones_like(img_proc).astype(np.float32) #/ 255
+            human_seg_mask = np.ones_like(img_proc).astype(np.float32)  # / 255
 
         fps_tracker.start_segment("Acid")
         # Acid
