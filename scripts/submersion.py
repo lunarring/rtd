@@ -40,10 +40,14 @@ from rtd.utils.prompt_provider import (
     PromptProviderMicrophone,
     PromptProviderTxtFile,
 )
+from rtd.utils.misc_utils import get_repo_path
 import time
 import numpy as np
 from rtd.utils.frame_interpolation import AverageFrameInterpolator
 import torch
+import os
+import sys
+import cv2
 import cv2
 
 
@@ -129,8 +133,8 @@ if __name__ == "__main__":
         device=device,
     )
     speech_detector = lt.Speech2Text()
-    prompt_provider_microphone = PromptProviderMicrophone()
-    prompt_provider_txt_file = PromptProviderTxtFile("materials/prompts/good_prompts_wl_community.txt")
+    prompt_provider_mic = PromptProviderMicrophone(init_prompt="A beautiful landscape")
+    prompt_provider_txt_file = PromptProviderTxtFile(get_repo_path("materials/prompts/good_prompts_wl_community.txt", __file__))
     opt_flow_estimator = OpticalFlowEstimator(use_ema=False)
 
     posteffect_processor = Posteffect()
@@ -162,32 +166,69 @@ if __name__ == "__main__":
         dyn_prompt_del_current = meta_input.get(akai_midimix="F4", button_mode="released_once")
 
         do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="E3", button_mode="toggle", val_default=False)
-        do_acid_wobblers = meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
+        #do_acid_wobblers = meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
+        do_acid_wobblers = False
         do_infrared_colorize = meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
         do_audio_modulation = meta_input.get(akai_midimix="D4", button_mode="toggle", val_default=False)
-        do_param_oscillators = meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
-        do_opt_flow_seg = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
+        #do_param_oscillators = meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
+        do_param_oscillators = False
+        do_opt_flow_seg = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=False)
 
-        do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=True)
+        #do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=True)
         do_postproc = meta_input.get(akai_midimix="E4", button_mode="toggle", val_default=False)
 
+        do_optical_flow = do_postproc or do_opt_flow_seg
         # floats
         acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.0)
         acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.0)
         opt_flow_threshold = meta_input.get(akai_lpd8="E2", akai_midimix="E2", val_min=0, val_max=2, val_default=1)
         coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=0.3, val_default=0.00)
-        zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H2", val_min=0.5, val_max=1.5, val_default=1.0)
-        x_shift = int(meta_input.get(akai_midimix="H0", val_min=-50, val_max=50, val_default=0))
-        y_shift = int(meta_input.get(akai_midimix="H1", val_min=-50, val_max=50, val_default=0))
-        color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="G0", val_min=0, val_max=1, val_default=0.5)
+        #zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H2", val_min=0.5, val_max=1.5, val_default=1.0)
+        zoom_out_factor = meta_input.get(akai_lpd8="F1", akai_midimix="G5", val_min=0, val_max=0.3, val_default=0)
+        zoom_in_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H5", val_min=0, val_max=0.3, val_default=0)
+        if zoom_in_factor * zoom_out_factor == 0:
+            zoom_factor = 1 - zoom_in_factor + zoom_out_factor
+        else:
+            zoom_factor = 1 + oscillator.get("zoom_factor", 1./(3*zoom_in_factor), zoom_out_factor, -zoom_out_factor, "continuous")
+
+        
+        # X shift with oscillation when both directions are active
+        x_shift_left = meta_input.get(akai_midimix="G1", val_min=0, val_max=50, val_default=0)
+        x_shift_right = meta_input.get(akai_midimix="H1", val_min=0, val_max=50, val_default=0)
+        if x_shift_left * x_shift_right == 0:
+            x_shift = int(x_shift_right - x_shift_left)
+        else:
+            x_shift = int(oscillator.get("x_shift", 1./(3*x_shift_right), x_shift_left, -x_shift_right, "continuous"))
+
+        
+        # Y shift with oscillation when both directions are active
+        y_shift_up = meta_input.get(akai_midimix="G0", val_min=0, val_max=50, val_default=0)
+        y_shift_down = meta_input.get(akai_midimix="H0", val_min=0, val_max=50, val_default=0)
+        if y_shift_up * y_shift_down == 0:
+            y_shift = int(y_shift_down - y_shift_up)
+        else:
+            y_shift = int(oscillator.get("y_shift", 1./(3*y_shift_down), y_shift_up, -y_shift_down, "continuous"))
+
+        
+        # Rotation with oscillation when both directions are active
+        rotation_left = meta_input.get(akai_midimix="G2", val_min=0, val_max=30, val_default=0)
+        rotation_right = meta_input.get(akai_midimix="H2", val_min=0, val_max=30, val_default=0)
+        if rotation_left * rotation_right == 0:
+            rotation_angle = rotation_right - rotation_left
+        else:
+            rotation_angle = oscillator.get("rotation_angle", 1./(3*rotation_right), rotation_left, -rotation_right, "continuous")
+
+        
+        color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="D0", val_min=0, val_max=1, val_default=0.5)
         brightness = meta_input.get(akai_midimix="A0", val_min=0.0, val_max=2, val_default=1.0)
-        rotation_angle = meta_input.get(akai_midimix="D0", val_min=-30, val_max=30, val_default=0)
         # Add latent acid strength parameter
-        latent_acid_strength = meta_input.get(akai_midimix="D1", val_min=0, val_max=1.0, val_default=0.0)
+        #latent_acid_strength = meta_input.get(akai_midimix="D1", val_min=0, val_max=1.0, val_default=0.0)
+        latent_acid_strength = 0.0
 
         # Modulation controls
-        mod_samp = meta_input.get(akai_midimix="F2", val_min=0, val_max=10, val_default=0)
+        # mod_samp = meta_input.get(akai_midimix="F2", val_min=0, val_max=10, val_default=0)
+        mod_samp = 0
         mod_emb = meta_input.get(akai_midimix="F1", val_min=0, val_max=10, val_default=2)
 
         # Set up modulations dictionary
@@ -210,8 +251,8 @@ if __name__ == "__main__":
         # dynamic_func_coef3 = meta_input.get(akai_midimix="F2", val_min=0, val_max=1, val_default=0.5)
 
         #  postproc control
-        postproc_func_coef1 = meta_input.get(akai_lpd8="H0", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
-        postproc_func_coef2 = meta_input.get(akai_lpd8="H1", akai_midimix="G2", val_min=0, val_max=1, val_default=0.5)
+        postproc_func_coef1 = 0.5 # meta_input.get(akai_lpd8="H0", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
+        postproc_func_coef2 = 0.5 # meta_input.get(akai_lpd8="H1", akai_midimix="G2", val_min=0, val_max=1, val_default=0.5)
         postproc_mod_button1 = meta_input.get(akai_midimix="G4", button_mode="toggle", val_default=True)
 
         #  oscillator-based control
@@ -239,10 +280,10 @@ if __name__ == "__main__":
         #     print(f'dynamic processor is currently not compatible with compile mode')
         #     do_dynamic_processor = False
 
-        new_diffusion_prompt_available_from_mic = prompt_provider_microphone.handle_unmute_button(new_prompt_mic_unmuter)
+        new_diffusion_prompt_available_from_mic = prompt_provider_mic.handle_unmute_button(new_prompt_mic_unmuter)
 
         if new_diffusion_prompt_available_from_mic:
-            current_prompt = prompt_provider_microphone.get_current_prompt()
+            current_prompt = prompt_provider_mic.get_current_prompt()
             do_prompt_change = True
             # print(f"New prompt: {current_prompt}")
             # if do_diffusion:

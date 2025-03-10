@@ -1,13 +1,15 @@
-import numpy as np
-import cv2
 import torch
 import torch.nn.functional as F
-from rtd.utils.FastFlowNet_v2 import FastFlowNet
+import numpy as np
+import cv2
+import os
+from .FastFlowNet_v2 import FastFlowNet
 from lunar_tools.cam import WebCam
 import time
 import argparse
 from matplotlib import pyplot as plt
-
+import lunar_tools as lt
+from rtd.utils.misc_utils import get_repo_path
 
 class OpticalFlowEstimator:
     """
@@ -23,14 +25,14 @@ class OpticalFlowEstimator:
         use_ema (bool): Whether to use exponential moving average for temporal smoothing.
     """
 
-    def __init__(self, model_path="./checkpoints/fastflownet_ft_mix.pth", div_flow=20.0, div_size=64, 
+    def __init__(self, model_path=None, div_flow=20.0, div_size=64, 
                  return_numpy=True, device="cuda:0", use_ema=False):
         """
         Initializes the OpticalFlowEstimator with the specified model path, flow division factor,
         division size, and device.
 
         Args:
-            model_path (str): Path to the pre-trained model weights.
+            model_path (str): Path to the pre-trained model weights. If None, uses default path.
             div_flow (float): Scaling factor for the flow output.
             div_size (int): Size to which input images are padded for processing.
             device (str): Device to run the model on (e.g., 'cuda:0').
@@ -39,6 +41,11 @@ class OpticalFlowEstimator:
         """
         self.device = torch.device(device)
         self.model = FastFlowNet().to(self.device).eval()
+        
+        # Use default path if none provided
+        if model_path is None:
+            model_path = get_repo_path("checkpoints/fastflownet_ft_mix.pth", __file__)
+        
         self.model.load_state_dict(torch.load(model_path))
         self.div_flow = div_flow
         self.div_size = div_size

@@ -5,11 +5,12 @@ import lunar_tools as lt
 from PIL import Image  # added for loading particle image
 import os
 import random
+from rtd.utils.misc_utils import get_repo_path
 
 class Posteffect():
     def __init__(self, device='cuda:0', motion_adaptive_blend=True, use_diffusion_field=True, 
                  enable_recent_motion_color_boost=False, enable_particle_effect=True, 
-                 particle_image_path="materials/images", enable_upward_offset=True) -> None:
+                 particle_image_path=get_repo_path('materials/images', __file__), enable_upward_offset=True) -> None:
         self.device = device
         self.accumulated_frame = None  # added state to accumulate frames
         self.motion_adaptive_blend = motion_adaptive_blend

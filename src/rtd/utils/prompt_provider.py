@@ -98,12 +98,24 @@ class PromptProviderTxtFile(PromptProvider):
     def __init__(self, file_path: str):
         super().__init__("picture of a cat")
         self._file_path = file_path
-        self.load_prompts()
-        self._current_prompt = self.list_prompts[0]
+        try:
+            self.load_prompts()
+            self._current_prompt = self.list_prompts[0] if self.list_prompts else "picture of a cat"
+        except FileNotFoundError:
+            print(f"Warning: Prompt file not found at {file_path}. Using default prompt.")
+            self.list_prompts = ["picture of a cat"]
+            self._current_prompt = "picture of a cat"
+        except Exception as e:
+            print(f"Error loading prompts from {file_path}: {e}")
+            self.list_prompts = ["picture of a cat"]
+            self._current_prompt = "picture of a cat"
 
     def load_prompts(self):
         with open(self._file_path, "r", encoding="utf-8") as file:
-            self.list_prompts = file.readlines()
+            self.list_prompts = [line.strip() for line in file.readlines() if line.strip()]
+            if not self.list_prompts:
+                print(f"Warning: No prompts found in {self._file_path}. Using default prompt.")
+                self.list_prompts = ["picture of a cat"]
 
     def handle_prompt_cycling_button(self, cycle_prompt_button_state: bool):
         """
