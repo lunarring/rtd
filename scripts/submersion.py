@@ -36,6 +36,7 @@ from rtd.utils.optical_flow import OpticalFlowEstimator
 from rtd.utils.posteffect import Posteffect
 from rtd.utils.audio_detector import AudioDetector
 from rtd.utils.oscillators import Oscillator
+from rtd.utils.accgyro_receiver import AccelerometerGyroReceiver
 from rtd.utils.prompt_provider import (
     PromptProviderMicrophone,
     PromptProviderTxtFile,
@@ -61,8 +62,8 @@ def get_sample_shape_unet(coord, noise_resolution_h, noise_resolution_w):
 
 
 if __name__ == "__main__":
-    height_diffusion = int((384 + 96) * 1.5)  # 12 * (384 + 96) // 8
-    width_diffusion = int((512 + 128) * 1.5)  # 12 * (512 + 128) // 8
+    height_diffusion = int((384 + 96) * 1.0)  # 12 * (384 + 96) // 8
+    width_diffusion = int((512 + 128) * 1.0)  # 12 * (512 + 128) // 8
     height_render = 1080
     width_render = 1920
     n_frame_interpolations: int = 5
@@ -71,6 +72,8 @@ if __name__ == "__main__":
     do_diffusion = True
     do_fullscreen = True
     do_enable_dynamic_processor = True
+
+    do_phone_acidplanes = False
 
     device = "cuda:0"
     img_diffusion = None
@@ -140,6 +143,9 @@ if __name__ == "__main__":
 
     # initialize effect value oscillator
     oscillator = Oscillator()
+
+    #  initialize phone acidplanes
+    accgyro_receiver = AccelerometerGyroReceiver(host='', port=7777)
 
     # Initialize FPS tracking
     fps_tracker = lt.FPSTracker()
@@ -322,6 +328,35 @@ if __name__ == "__main__":
         acid_processor.set_do_acid_wobblers(do_acid_wobblers)
         acid_processor.set_color_matching(color_matching)
         acid_processor.set_rotation_angle(rotation_angle)
+
+        #  control acid planes with phone-based accelerometer / gyroscope
+        if do_phone_acidplanes:
+            acid_processor.set_acid_strength(1)
+            acid_processor.set_coef_noise(0.2)
+            acid_processor.set_acid_tracers(False)
+            acid_processor.set_acid_strength_foreground(1)
+
+            angle_x, angle_y, angle_z = accgyro_receiver.get_last_gyroscope_values()
+            angular_vel_z = accgyro_receiver.get_last_angular_velocity_z()
+            positions = accgyro_receiver.get_last_positions()
+
+            if positions is not None:
+                pos_x, pos_y, pos_z = positions
+            else:
+                pos_x = 0; pos_y = 0; pos_z = 0
+
+            # print(f"Rotation angles: X: {angle_x:.2f}, Y: {angle_y:.2f}, Z: {angle_z:.2f} deg")
+            acid_processor.set_rotation_angle(angular_vel_z / 10)
+
+            zoom_factor = 1 - angle_x / 200
+            zoom_factor = np.clip(zoom_factor, 0.8, 1.2)
+            acid_processor.set_zoom_factor(zoom_factor)
+            x_shift = -angle_y / 2
+            # x_shift = pos_x * 1000
+            acid_processor.set_x_shift(int(x_shift))
+            y_shift = 0
+            acid_processor.set_y_shift(int(y_shift))
+
         img_acid = acid_processor.process(img_proc, human_seg_mask)
 
         # Start timing diffusion
