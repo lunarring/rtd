@@ -562,7 +562,7 @@ class AcidProcessor:
             t_rand = (torch.rand(img_input_torch.shape, device=img_input_torch.device)[:, :, 0].unsqueeze(2) - 0.5) * self.coef_noise * 255
             img_input_torch += t_rand
         # Apply color matching if enabled
-        if self.color_matching > 0.01:
+        if np.abs(self.color_matching-0.5) > 0.01:
             if human_seg_mask is not None:
                 if human_seg_mask.ndim == 2:
                     human_seg_mask = np.expand_dims(human_seg_mask, axis=2)

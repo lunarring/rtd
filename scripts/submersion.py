@@ -30,7 +30,7 @@
 from rtd.sdxl_turbo.diffusion_engine import DiffusionEngine
 from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
 import lunar_tools as lt
-from rtd.dynamic_processor.processor_dynamic_module import DynamicProcessor
+# from rtd.dynamic_processor.processor_dynamic_module import DynamicProcessor
 from rtd.utils.input_image import InputImageProcessor, AcidProcessor
 from rtd.utils.optical_flow import OpticalFlowEstimator
 from rtd.utils.posteffect import Posteffect
@@ -71,14 +71,14 @@ if __name__ == "__main__":
     do_compile = True
     do_diffusion = True
     do_fullscreen = True
-    do_enable_dynamic_processor = True
+    do_enable_dynamic_processor = False
 
     do_phone_acidplanes = False
 
     device = "cuda:0"
     img_diffusion = None
 
-    dynamic_processor = DynamicProcessor()
+    #dynamic_processor = DynamicProcessor()
 
     if do_diffusion:
         device = "cuda:0"
@@ -163,7 +163,8 @@ if __name__ == "__main__":
         do_cycle_prompt_from_file = meta_input.get(akai_lpd8="C0", akai_midimix="A4", button_mode="pressed_once")
 
         dyn_prompt_mic_unmuter = meta_input.get(akai_lpd8="A0", akai_midimix="B3", button_mode="held_down")
-        do_dynamic_processor = meta_input.get(akai_lpd8="B0", akai_midimix="B4", button_mode="toggle", val_default=False)
+        #do_dynamic_processor = meta_input.get(akai_lpd8="B0", akai_midimix="B4", button_mode="toggle", val_default=False)
+        do_dynamic_processor = False
         dyn_prompt_restore_backup = meta_input.get(akai_midimix="F3", button_mode="released_once")
         dyn_prompt_del_current = meta_input.get(akai_midimix="F4", button_mode="released_once")
 
@@ -173,11 +174,11 @@ if __name__ == "__main__":
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
         do_audio_modulation = meta_input.get(akai_midimix="D4", button_mode="toggle", val_default=False)
         do_param_oscillators = meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
-        do_opt_flow_seg = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
+        do_opt_flow_seg = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=False)
 
-        do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=True)
         do_postproc = meta_input.get(akai_midimix="E4", button_mode="toggle", val_default=False)
-
+        # do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=True)
+        do_optical_flow = do_postproc or do_opt_flow_seg
         # floats
         acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.0)
         acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.0)

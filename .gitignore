@@ -1,4 +1,8 @@
 # Byte-compiled / optimized / DLL files
+# Ignore all JPG images in materials/images folder
+materials/images/*.jpg
+materials/images/*.jpeg
+
 src/rtd/dynamic_processor/dynamic_module.py
 */logs/*
 backup_dynamic*
