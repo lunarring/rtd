@@ -109,8 +109,8 @@ def get_sample_shape_unet(coord, noise_resolution_h, noise_resolution_w):
 
 
 if __name__ == "__main__":
-    height_diffusion = int((384 + 96) * 1.5)  # 12 * (384 + 96) // 8
-    width_diffusion = int((512 + 128) * 1.5)  # 12 * (512 + 128) // 8
+    height_diffusion = int((384 + 96) * 2.0)  # 12 * (384 + 96) // 8
+    width_diffusion = int((512 + 128) * 2.0)  # 12 * (512 + 128) // 8
     height_render = 1080
     width_render = 1920
     n_frame_interpolations: int = 5
@@ -119,11 +119,15 @@ if __name__ == "__main__":
     touchdesigner_host = "192.168.100.101"  # Change to your TouchDesigner machine's IP
     touchdesigner_port = 9998
 
-    do_compile = False
+    do_compile = True
     do_diffusion = True
     do_fullscreen = True
     do_enable_dynamic_processor = False
-    do_send_to_touchdesigner = True
+    do_send_to_touchdesigner = False
+    do_load_cam_input_from_file = False
+    do_save_diffusion_output_to_file = True
+    video_file_path_input = "materials/videos/long_cut.mp4"
+    video_file_path_output = "materials/videos/long_cut_diffusion2.mp4"
 
 
     device = "cuda:0"
@@ -141,8 +145,8 @@ if __name__ == "__main__":
     init_prompt = "Rare colorful flower petals, intricate blue interwoven patterns of exotic flowers"
     # init_prompt = 'Trippy and colorful long neon forest leaves and folliage fractal merging'
     init_prompt = "Dancing people full of glowing neon nerve fibers and filamenets"
-    init_prompt = "glowing digital fire full of glitches and neon matrix powerful fire glow and plasma"
-    init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
+    # init_prompt = "glowing digital fire full of glitches and neon matrix powerful fire glow and plasma"
+    # init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
 
     meta_input = lt.MetaInput()
     de_img = DiffusionEngine(
@@ -165,7 +169,17 @@ if __name__ == "__main__":
         backend="opencv",
         do_fullscreen=do_fullscreen,
     )
-    cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3)
+    cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=2)
+    cam.do_mirror = True
+    
+    # Initialize movie reader if loading from file
+    if do_load_cam_input_from_file:
+        movie_reader = lt.MovieReader(video_file_path_input)
+    
+    # Initialize movie saver if saving output to file
+    if do_save_diffusion_output_to_file:
+        movie_saver = lt.MovieSaver(video_file_path_output, fps=12)
+    
     input_image_processor = InputImageProcessor(device=device)
     input_image_processor.set_flip(do_flip=True, flip_axis=1)
 
@@ -233,6 +247,8 @@ if __name__ == "__main__":
 
         do_optical_flow = do_postproc or do_opt_flow_seg
         # floats
+        # nmb_inference_steps = meta_input.get(akai_midimix="B0", val_min=2, val_max=10.0, val_default=2.0)
+        nmb_inference_steps = 6
         acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.0)
         acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.0)
         opt_flow_threshold = meta_input.get(akai_lpd8="E2", akai_midimix="E2", val_min=0, val_max=2, val_default=1)
@@ -378,10 +394,12 @@ if __name__ == "__main__":
         # Get camera framerate from the camera thread
         camera_fps = cam.get_fps()
 
-        if 1 or frame_counter < 10:
+        if frame_counter < 10 or not do_load_cam_input_from_file:
             img_cam = cam.get_img()
         else:
-            img_cam = img_cam_last
+            # Get frame from video file instead of webcam
+            img_cam = movie_reader.get_next_frame()[:,:,::-1].copy()
+                    
         img_cam_last = img_cam.copy()
 
         fps_tracker.start_segment("OptFlow")
@@ -421,6 +439,7 @@ if __name__ == "__main__":
         # Start timing diffusion
         de_img.set_input_image(img_acid)
         de_img.set_guidance_scale(0.5)
+        de_img.set_num_inference_steps(int(nmb_inference_steps))
         de_img.set_strength(1 / de_img.num_inference_steps + 0.00001)
 
         fps_tracker.start_segment("Diffu")
@@ -480,6 +499,15 @@ if __name__ == "__main__":
 
         if do_send_to_touchdesigner:
             td_sender.send_image(output_to_render)
+            
+        if do_save_diffusion_output_to_file:
+            movie_saver.write_frame(output_to_render)
+            if frame_counter >= 512*8:
+                movie_saver.finalize()
+                print(f"Movie saved to {video_file_path_output} after {frame_counter+1} frames")
+                do_save_diffusion_output_to_file = False
+
+        
 
         # Update and display FPS (this will also handle the last segment timing)
         fps_tracker.print_fps()
