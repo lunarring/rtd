@@ -30,7 +30,7 @@
 from rtd.sdxl_turbo.diffusion_engine import DiffusionEngine
 from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
 import lunar_tools as lt
-from rtd.dynamic_processor.processor_dynamic_module import DynamicProcessor
+#from rtd.dynamic_processor.processor_dynamic_module import DynamicProcessor
 from rtd.utils.input_image import InputImageProcessor, AcidProcessor
 from rtd.utils.optical_flow import OpticalFlowEstimator
 from rtd.utils.posteffect import Posteffect
@@ -48,8 +48,52 @@ import torch
 import os
 import sys
 import cv2
-import cv2
+import socket
 
+from rtd.utils.compression_helpers import send_compressed
+
+class TouchDesignerSender:
+    def __init__(self, host="localhost", port=9998):
+        self.host = host
+        self.port = port
+        self.socket = None
+        self.connected = False
+        self.attempt_reconnect = True
+        self.last_reconnect_time = 0
+        self.reconnect_interval = 5  # seconds between reconnection attempts
+        
+    def connect(self):
+        try:
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            self.socket.settimeout(0.5)  # Short timeout for connection attempts
+            self.socket.connect((self.host, self.port))
+            self.connected = True
+            self.socket.settimeout(None)  # Reset timeout for normal operation
+            print(f"Connected to TouchDesigner at {self.host}:{self.port}")
+            return True
+        except Exception as e:
+            print(f"Failed to connect to TouchDesigner: {e}")
+            self.connected = False
+            return False
+    
+    def send_image(self, image):
+        if not self.connected:
+            current_time = time.time()
+            if self.attempt_reconnect and (current_time - self.last_reconnect_time > self.reconnect_interval):
+                self.last_reconnect_time = current_time
+                self.connect()
+            
+            if not self.connected:
+                return False
+                
+        try:
+            send_compressed(self.socket, image, quality=90)
+            return True
+        except Exception as e:
+            print(f"Error sending to TouchDesigner: {e}")
+            self.connected = False
+            return False
 
 def get_sample_shape_unet(coord, noise_resolution_h, noise_resolution_w):
     channels = 640 if coord[0] == "e" else 1280 if coord[0] == "b" else 640
@@ -71,15 +115,22 @@ if __name__ == "__main__":
     width_render = 1920
     n_frame_interpolations: int = 5
     shape_hw_cam = (576, 1024)
-    do_compile = True
+
+    touchdesigner_host = "192.168.100.101"  # Change to your TouchDesigner machine's IP
+    touchdesigner_port = 9998
+
+    do_compile = False
     do_diffusion = True
     do_fullscreen = True
-    do_enable_dynamic_processor = True
+    do_enable_dynamic_processor = False
+    do_send_to_touchdesigner = True
+
 
     device = "cuda:0"
     img_diffusion = None
 
-    dynamic_processor = DynamicProcessor()
+    if do_enable_dynamic_processor:
+        dynamic_processor = DynamicProcessor()
 
     if do_diffusion:
         device = "cuda:0"
@@ -117,6 +168,10 @@ if __name__ == "__main__":
     cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3)
     input_image_processor = InputImageProcessor(device=device)
     input_image_processor.set_flip(do_flip=True, flip_axis=1)
+
+    if do_send_to_touchdesigner:
+        td_sender = TouchDesignerSender(host=touchdesigner_host, port=touchdesigner_port)
+        td_sender.connect()
 
     # Initialize modulations dictionary and noise
     modulations = {}
@@ -424,6 +479,9 @@ if __name__ == "__main__":
         t_processing = time.time() - t_processing_start
         # for frame in interpolated_frames:
         renderer.render(img_proc if do_debug_seethrough else output_to_render)
+
+        if do_send_to_touchdesigner:
+            td_sender.send_image(output_to_render)
 
         # Update and display FPS (this will also handle the last segment timing)
         fps_tracker.print_fps()
