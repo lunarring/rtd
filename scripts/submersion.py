@@ -215,19 +215,17 @@ if __name__ == "__main__":
         prompt_transition_time = meta_input.get(akai_lpd8="G1", akai_midimix="A1", val_min=1, val_max=20, val_default=8.0)
         do_cycle_prompt_from_file = meta_input.get(akai_lpd8="C0", akai_midimix="A4", button_mode="pressed_once")
 
-        dyn_prompt_mic_unmuter = meta_input.get(akai_lpd8="A0", akai_midimix="B3", button_mode="held_down")
-        do_dynamic_processor = meta_input.get(akai_lpd8="B0", akai_midimix="B4", button_mode="toggle", val_default=False)
-        dyn_prompt_restore_backup = meta_input.get(akai_midimix="F3", button_mode="released_once")
-        dyn_prompt_del_current = meta_input.get(akai_midimix="F4", button_mode="released_once")
+        dyn_prompt_mic_unmuter = False # meta_input.get(akai_lpd8="A0", akai_midimix="B3", button_mode="held_down")
+        do_dynamic_processor = False # meta_input.get(akai_lpd8="B0", akai_midimix="B4", button_mode="toggle", val_default=False)
+        dyn_prompt_restore_backup = False # meta_input.get(akai_midimix="F3", button_mode="released_once")
+        dyn_prompt_del_current = False # meta_input.get(akai_midimix="F4", button_mode="released_once")
 
         do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="E3", button_mode="toggle", val_default=False)
-        #do_acid_wobblers = meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
-        do_acid_wobblers = False
-        do_infrared_colorize = meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
+        do_acid_wobblers = False #meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
+        do_infrared_colorize = False #meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
-        do_audio_modulation = meta_input.get(akai_midimix="D4", button_mode="toggle", val_default=False)
-        #do_param_oscillators = meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
-        do_param_oscillators = False
+        do_audio_modulation = False #meta_input.get(akai_midimix="D4", button_mode="toggle", val_default=False)
+        do_param_oscillators = False #meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
         do_opt_flow_seg = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=False)
 
         #do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=True)

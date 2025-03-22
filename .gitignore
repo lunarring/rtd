@@ -7,6 +7,8 @@ logs/*
 *.py~
 *.swp
 prompts/*
+# Ignore all images in materials/images directory
+materials/images/
 dynamic_module.json
 dynamic_module.py
 *.pyc
