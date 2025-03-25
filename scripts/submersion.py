@@ -110,12 +110,15 @@ def get_sample_shape_unet(coord, noise_resolution_h, noise_resolution_w):
 
 
 if __name__ == "__main__":
-    height_diffusion = int((384 + 96) * 2.0)  # 12 * (384 + 96) // 8
-    width_diffusion = int((512 + 128) * 2.0)  # 12 * (512 + 128) // 8
+    height_diffusion = int(480 * 1.5)  # 12 * (384 + 96) // 8
+    width_diffusion = int(640 * 1.5)  # 12 * (512 + 128) // 8
+    height_diffusion = 648
+    width_diffusion = 1152
     height_render = 1080
     width_render = 1920
     n_frame_interpolations: int = 5
     shape_hw_cam = (576, 1024)
+    shape_hw_cam = (1080, 1920)
 
     touchdesigner_host = "192.168.100.101"  # Change to your TouchDesigner machine's IP
     touchdesigner_port = 9998
@@ -125,7 +128,7 @@ if __name__ == "__main__":
     do_fullscreen = True
     do_enable_dynamic_processor = False
     do_send_to_touchdesigner = False
-    do_load_cam_input_from_file = True
+    do_load_cam_input_from_file = False
     do_save_diffusion_output_to_file = False
     video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
     print(video_file_path_input)
@@ -171,8 +174,8 @@ if __name__ == "__main__":
         backend="opencv",
         do_fullscreen=do_fullscreen,
     )
-    cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=0)
-    cam.do_mirror = False
+    cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=0, frame_rate=25.0)
+    cam.do_mirror = True
     
     # Initialize movie reader if loading from file
     if do_load_cam_input_from_file:
