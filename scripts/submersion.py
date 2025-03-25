@@ -125,9 +125,9 @@ if __name__ == "__main__":
     do_fullscreen = True
     do_enable_dynamic_processor = False
     do_send_to_touchdesigner = False
-    do_load_cam_input_from_file = False
+    do_load_cam_input_from_file = True
     do_save_diffusion_output_to_file = False
-    video_file_path_input = get_repo_path("materials/videos/long.mp4")
+    video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
     print(video_file_path_input)
     video_file_path_output = "materials/videos/long_cut_diffusion2.mp4"
 
@@ -407,7 +407,19 @@ if __name__ == "__main__":
             img_cam = cam.get_img()
         else:
             # Get frame from video file instead of webcam
-            img_cam = movie_reader.get_next_frame()[:,:,::-1].copy()
+            img_cam = movie_reader.get_next_frame()
+            
+            # If we reached the end of the video (get_next_frame returns empty/black frame), reset the video reader
+            if img_cam is None or (isinstance(img_cam, np.ndarray) and (img_cam.size == 0 or np.max(img_cam) == 0)):
+                print("End of video reached, looping back to the beginning")
+                # Re-initialize the movie reader to restart the video
+                movie_reader = lt.MovieReader(video_file_path_input)
+                # Get the first frame
+                img_cam = movie_reader.get_next_frame()
+            
+            # Convert BGR to RGB for processing
+            if img_cam is not None and img_cam.size > 0:
+                img_cam = img_cam[:,:,::-1].copy()
                     
         img_cam_last = img_cam.copy()
 
@@ -428,8 +440,30 @@ if __name__ == "__main__":
         input_image_processor.set_opt_flow_threshold(opt_flow_threshold)
         img_proc, human_seg_mask = input_image_processor.process(img_cam, opt_flow)
 
-        if not do_human_seg and not do_opt_flow_seg:
-            human_seg_mask = np.ones_like(img_proc).astype(np.float32)  # / 255
+        # Ensure we have a valid mask
+        if human_seg_mask is None:
+            # Create a default mask if none was returned
+            human_seg_mask = np.ones((img_proc.shape[0], img_proc.shape[1]), dtype=np.float32)
+        elif not do_human_seg and not do_opt_flow_seg:
+            # Override with all ones mask when segmentation is disabled
+            human_seg_mask = np.ones((img_proc.shape[0], img_proc.shape[1]), dtype=np.float32)
+        elif human_seg_mask.ndim == 3:
+            # Convert 3-channel mask to single channel
+            human_seg_mask = human_seg_mask[:,:,0].astype(np.float32)
+            if human_seg_mask.max() > 1.0:  # If in range 0-255, normalize to 0-1
+                human_seg_mask = human_seg_mask / 255.0
+        
+        # Ensure mask dimensions match the processed image
+        if human_seg_mask.shape[:2] != img_proc.shape[:2]:
+            print(f"Warning: Mask shape {human_seg_mask.shape[:2]} doesn't match image shape {img_proc.shape[:2]}. Resizing mask.")
+            human_seg_mask = cv2.resize(
+                human_seg_mask, 
+                (img_proc.shape[1], img_proc.shape[0]), 
+                interpolation=cv2.INTER_LINEAR
+            )
+            # Keep mask binary if it was binary
+            if np.all(np.logical_or(human_seg_mask < 0.1, human_seg_mask > 0.9)):
+                human_seg_mask = (human_seg_mask > 0.5).astype(np.float32)
 
         fps_tracker.start_segment("Acid")
         # Acid
@@ -470,7 +504,7 @@ if __name__ == "__main__":
                     dynamic_processor.delete_current_fn_func()
                 img_proc = dynamic_processor.process(
                     np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
-                    human_seg_mask.astype(np.float32) / 255,
+                    human_seg_mask.astype(np.float32),
                     opt_flow,
                     postproc_func_coef1,
                 )
@@ -482,7 +516,7 @@ if __name__ == "__main__":
                 if opt_flow is not None:
                     output_to_render, update_img = posteffect_processor.process(
                         img_diffusion,
-                        human_seg_mask.astype(np.float32) / 255,
+                        human_seg_mask.astype(np.float32),
                         opt_flow,
                         postproc_func_coef1,
                         postproc_func_coef2,

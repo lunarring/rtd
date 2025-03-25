@@ -10,6 +10,7 @@ import lunar_tools as lt
 from ultralytics import YOLO
 from huggingface_hub import hf_hub_download
 import torch.nn.functional as F
+import cv2
 
 class HumanSeg:
     """
@@ -42,6 +43,16 @@ class HumanSeg:
         self.apply_smoothing = apply_smoothing
         self.gaussian_kernel_size = gaussian_kernel_size
         self.gaussian_sigma = gaussian_sigma
+        self.input_is_rgb = False
+        
+        # Initialize shape_hw with a default size
+        self.shape_hw = (512, 512)  # Default size, will be updated on first call
+        
+        # Initialize transform
+        self.transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ])
     
     def set_resizing_factor(self, resizing_factor):
         """
@@ -52,31 +63,33 @@ class HumanSeg:
         """
         self.resizing_factor = resizing_factor
     
-    def get_mask(self, input_img):
-        """
-        This method generates a binary mask for the human body in the given image. The mask can be used for various applications like background removal, human pose estimation etc.
-
-        Args:
-            cam_img (np.ndarray): The input image in which the human body is to be segmented. The image should be in RGB format.
-
-        Returns: float32
-            Sets self.mask, a binary mask for the human body in the input image. The mask is of the same size as the input image.
-        """
-        if isinstance(input_img, np.ndarray) and input_img.dtype == np.float32:
-            input_img = input_img.astype(np.uint8)
+    def get_mask(self, img):
+        # Store original image dimensions for later resize
+        original_h, original_w = img.shape[:2]
         
-        if not isinstance(input_img, np.ndarray):
-            input_img = np.array(input_img)
+        # Update shape_hw based on input image and resizing factor
+        if self.resizing_factor is not None:
+            self.shape_hw = (int(original_h * self.resizing_factor), int(original_w * self.resizing_factor))
+        elif self.size is not None:
+            self.shape_hw = self.size
+        else:
+            self.shape_hw = (original_h, original_w)
+            
+        # Convert input to RGB if needed
+        if not self.input_is_rgb:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         
-        orig_size = (input_img.shape[1], input_img.shape[0])
-        input_tensor = self.preprocess(input_img.copy())
+        # Resize for model input
+        img_resized = cv2.resize(img, (self.shape_hw[1], self.shape_hw[0]))
         
-        if self.resizing_factor is not None or self.size is not None:
-            input_tensor = lt.resize(input_tensor, resizing_factor=self.resizing_factor, size=self.size)
+        # Normalize image
+        input_tensor = self.transform(img_resized)
+        input_batch = input_tensor.unsqueeze(0).to(self.device)
         
-        input_batch = input_tensor.unsqueeze(0)
-        input_batch = input_batch.to(self.device)
+        # Ensure input has the correct data type (float32 to match model weights)
+        input_batch = input_batch.float()
         
+        # Run model inference
         with torch.no_grad():
             output = self.model(input_batch)['out'][0]
         
@@ -93,19 +106,17 @@ class HumanSeg:
             gaussian_kernel = gaussian_kernel / gaussian_kernel.sum()
             gaussian_kernel = gaussian_kernel.view(1, 1, kernel_size, kernel_size)
             smoothed_mask = F.conv2d(mask_tensor, gaussian_kernel, padding=kernel_size//2)
-            # smoothed_mask = (smoothed > 0.5).float()
             mask = smoothed_mask.squeeze().float().cpu().numpy()
-            mask = lt.resize(mask*255, size=(orig_size[1], orig_size[0])) / 255
         else:
             mask = (output_predictions == self.sel_id).byte().cpu().numpy()
         
-            if self.resizing_factor is not None or self.size is not None:
-                mask = lt.resize(mask, size=(orig_size[1], orig_size[0]))
-                mask = np.round(mask)
-                mask = np.where(mask > 0.5, 1, 0)
+        # Resize the mask back to original image dimensions if different
+        if mask.shape != (original_h, original_w):
+            mask = cv2.resize(mask.astype(np.float32), (original_w, original_h), interpolation=cv2.INTER_LINEAR)
+            if not self.apply_smoothing:
+                mask = (mask > 0.5).astype(np.float32)
         
         self.mask = mask
-        
         return mask
     
     def apply_mask(self, input_img, mask_strength=1, invert_mask=False):
@@ -128,7 +139,15 @@ class HumanSeg:
             if input_img.dtype == np.float32:
                 input_img = input_img.astype(np.uint8)
         
-        assert input_img.shape[:2] == self.mask.shape, "The input image and the mask must have the same dimensions."
+        # Resize mask to match input image dimensions if they don't match
+        if input_img.shape[:2] != self.mask.shape:
+            print(f"Resizing mask from {self.mask.shape} to {input_img.shape[:2]}")
+            self.mask = cv2.resize(self.mask.astype(np.float32), (input_img.shape[1], input_img.shape[0]), 
+                                   interpolation=cv2.INTER_LINEAR)
+            # Ensure binary mask remains binary after resizing
+            if not self.apply_smoothing:
+                self.mask = (self.mask > 0.5).astype(np.float32)
+        
         assert 0 <= mask_strength <= 1, "mask_strength should be between 0 and 1"
         
         if self.apply_smoothing:
