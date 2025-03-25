@@ -124,7 +124,7 @@ if __name__ == "__main__":
     do_fullscreen = True
     do_enable_dynamic_processor = False
     do_send_to_touchdesigner = False
-    do_load_cam_input_from_file = True
+    do_load_cam_input_from_file = False
     do_save_diffusion_output_to_file = False
     video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
     print(video_file_path_input)
@@ -171,7 +171,7 @@ if __name__ == "__main__":
         do_fullscreen=do_fullscreen,
     )
     cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=0)
-    cam.do_mirror = False
+    cam.do_mirror = True
     
     # Initialize movie reader if loading from file
     if do_load_cam_input_from_file:
