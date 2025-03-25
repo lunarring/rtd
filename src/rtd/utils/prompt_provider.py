@@ -92,26 +92,12 @@ class PromptProviderMicrophone(PromptProvider):
 class PromptProviderTxtFile(PromptProvider):
     """
     A prompt provider that gets prompts from a text file.
-    Can cycle through prompts either randomly or sequentially.
+    This is just an example implementation.
     """
 
-    def __init__(self, file_path: str, mode: str = "random"):
-        """
-        Initialize the prompt provider with prompts from a text file.
-        
-        Args:
-            file_path: Path to the text file containing prompts (one per line)
-            mode: Selection mode - "random" or "sequential"
-        """
+    def __init__(self, file_path: str):
         super().__init__("picture of a cat")
         self._file_path = file_path
-        self._mode = mode.lower()
-        self._current_index = 0
-        
-        if self._mode not in ["random", "sequential"]:
-            print(f"Warning: Invalid mode '{mode}'. Using 'random' mode.")
-            self._mode = "random"
-            
         try:
             self.load_prompts()
             self._current_prompt = self.list_prompts[0] if self.list_prompts else "picture of a cat"
@@ -133,18 +119,11 @@ class PromptProviderTxtFile(PromptProvider):
 
     def handle_prompt_cycling_button(self, cycle_prompt_button_state: bool):
         """
-        Get the next prompt based on the selected mode.
-        
-        Args:
-            cycle_prompt_button_state: Boolean indicating if the cycle button was pressed
+        Get a random prompt from the list of prompts.
         """
         if cycle_prompt_button_state:
-            if self._mode == "random":
-                random_index = random.randint(0, len(self.list_prompts) - 1)
-                self._current_prompt = self.list_prompts[random_index]
-            else:  # sequential mode
-                self._current_index = (self._current_index + 1) % len(self.list_prompts)
-                self._current_prompt = self.list_prompts[self._current_index]
+            random_index = random.randint(0, len(self.list_prompts) - 1)
+            self._current_prompt = self.list_prompts[random_index]
 
     def get_current_prompt(self) -> str | bool:
         """

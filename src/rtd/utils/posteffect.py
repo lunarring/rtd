@@ -239,7 +239,7 @@ class Posteffect():
                 warped_particle = self.warp_tensor(particle_img, particle_flow)
                 self.accumulated_warped_particle = warped_particle
             else:
-                particle_img = self.accumulated_warped_particle * 0.9 + particle_img * 0.1
+                particle_img = self.accumulated_warped_particle * 0.9 + particle_img * 0.01
                 warped_particle = self.warp_tensor(particle_img, particle_flow)
 
                 # Reconstruct the final output image as it will be used:
@@ -255,7 +255,7 @@ class Posteffect():
                 norm_factor = 255.0 if torch.max(output_to_render) > 1.0 else 1.0
                 overall_brightness = torch.clamp(brightness / norm_factor, 0.0, 1.0).item()
 
-                brightness_limiter = 1 / (1 + overall_brightness*0.5)
+                brightness_limiter = 1 / (3 + overall_brightness*0.5)
 
                 #  limiter = mod_coef1 ** 2
                 limiter = mod_coef1

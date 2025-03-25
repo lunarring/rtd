@@ -235,101 +235,75 @@ class InputImageProcessor:
 
     # @exception_handler
     def process(self, img, opt_flow=None):
-        """
-        Process the input image according to the current configuration.
+        if isinstance(img, torch.Tensor):
+            img = img.squeeze(0)
+            img = img.cpu().numpy()
+            img = np.asarray(255 * img, dtype=np.uint8)
 
-        Args:
-            img: Input image as numpy array
-            opt_flow: Optional optical flow data
-
-        Returns:
-            (processed_image, mask)
-        """
-        if img is None:
-            return None, None
-
-        # Ensure we're working with uint8 image data
-        img = img.astype(np.uint8)
-        
-        # Process flip if enabled
         if self.flip_axis is not None:
-            img = cv2.flip(img, self.flip_axis)
+            img = np.flip(img, axis=self.flip_axis)
 
-        # Apply blur if enabled
         if self.do_blur:
-            img = cv2.GaussianBlur(img, (self.blur_kernel, self.blur_kernel), 0)
+            img_torch = torch.from_numpy(img.copy()).to(self.device).float()
+            img = self.blur(img_torch.permute([2, 0, 1])[None])[0].permute([1, 2, 0]).cpu().numpy()
 
-        # Apply brightness adjustment
-        if self.brightness != 1.0:
-            img = cv2.convertScaleAbs(img, alpha=self.brightness, beta=0)
-
-        # Convert to infrared-like colorization if enabled
-        if self.do_infrared_colorize:
-            img = self.infrared_colorizer.colorize(img)
-
-        # Initialize human segmentation mask
+        # Create masks
         human_seg_mask = None
-        
-        # Generate the appropriate mask based on settings
+        opt_flow_mask = None
+        final_mask = None
+
+        # Get human segmentation mask if enabled
         if self.do_human_seg:
-            # Get mask from human segmentation
-            try:
-                human_seg_mask = self.human_seg.get_mask(img)
-                
-                # Ensure mask has the correct dimensions
-                if human_seg_mask.shape[:2] != img.shape[:2]:
-                    human_seg_mask = cv2.resize(
-                        human_seg_mask.astype(np.float32), 
-                        (img.shape[1], img.shape[0]),
-                        interpolation=cv2.INTER_LINEAR
-                    )
-                    human_seg_mask = (human_seg_mask > 0.5).astype(np.float32)
-                
-                # Apply the mask to the image if human segmentation is enabled
-                try:
-                    self.human_seg.mask = human_seg_mask
-                    img = self.human_seg.apply_mask(img)
-                except Exception as e:
-                    print(f"Error applying mask: {e}")
-                    # Continue without applying mask
-            except Exception as e:
-                print(f"Error in human segmentation: {e}")
-                # Fallback to no mask on error
-                human_seg_mask = np.ones((img.shape[0], img.shape[1]), dtype=np.float32)
-        
-        elif self.do_opt_flow_seg and opt_flow is not None:
-            # Use optical flow-based segmentation if enabled and data is available
-            try:
-                # Calculate magnitude of optical flow
-                magnitude = np.linalg.norm(opt_flow, axis=2)
-                
-                # Apply threshold
-                human_seg_mask = np.zeros_like(magnitude, dtype=np.float32)
-                human_seg_mask[magnitude > self.opt_flow_threshold] = 1.0
-                
-                # Optional: Erosion for cleaner mask
-                if hasattr(self, 'use_erosion_mask') and self.use_erosion_mask:
-                    kernel = np.ones((7, 7), np.uint8)
-                    human_seg_mask = cv2.erode(human_seg_mask, kernel, iterations=1)
-                
-                # Apply the mask to the image
-                expanded_mask = np.expand_dims(human_seg_mask, axis=2)
+            human_seg_mask = self.human_seg.get_mask(img)
+
+        # Get optical flow mask if enabled
+        if self.do_opt_flow_seg and opt_flow is not None:
+            opt_flow_mask = self.create_opt_flow_mask(opt_flow)
+
+        # Combine masks if both exist
+        if human_seg_mask is not None and opt_flow_mask is not None:
+            final_mask = np.maximum(human_seg_mask, opt_flow_mask)
+        elif human_seg_mask is not None:
+            final_mask = human_seg_mask
+        elif opt_flow_mask is not None:
+            final_mask = opt_flow_mask
+
+        # Apply the final mask if it exists
+        if final_mask is not None:
+            # Apply the mask to the image
+            # Use human_seg's apply_mask if available, otherwise apply manually
+            if self.do_human_seg:
+                self.human_seg.mask = final_mask
+                img = self.human_seg.apply_mask(img)
+            else:
+                # Manual mask application - multiply image by mask
+                # Ensure mask has correct shape for broadcasting (H,W,1)
+                expanded_mask = np.expand_dims(final_mask, axis=2)
                 img = img.astype(np.float32) * expanded_mask
                 img = img.astype(np.uint8)
-            except Exception as e:
-                print(f"Error in optical flow segmentation: {e}")
-                # Fallback to no mask on error
-                human_seg_mask = np.ones((img.shape[0], img.shape[1]), dtype=np.float32)
-        
-        else:
-            # If no segmentation is enabled, use a mask of all ones (no masking)
-            human_seg_mask = np.ones((img.shape[0], img.shape[1]), dtype=np.float32)
+
+            # Convert mask to 3-channel format for return value
+            human_seg_mask = final_mask * 255
+            human_seg_mask = np.repeat(np.expand_dims(human_seg_mask, 2), 3, axis=2)
+            human_seg_mask = human_seg_mask.astype(np.uint8)
 
         # adjust brightness
-        img = img.astype(np.float32) * self.brightness
-        img = np.clip(img, 0, 255).astype(np.uint8)
+        img = img.astype(np.float32)
 
-        # Apply hue/saturation adjustments if needed
+        # if infrared, take mean of RGB channels and place it into red channel
+        if self.do_infrared_colorize:
+            img = self.infrared_colorizer.process(img)
+
+        # # time-averaging
+        # self.list_history_frames.append(img)
+        # if len(self.list_history_frames) > 10:
+        #     self.list_history_frames = self.list_history_frames[1:]
+        #     img = np.mean(np.stack(self.list_history_frames), axis=0)
+
+        img *= self.brightness
+        img = np.clip(img, 0, 255)
+        img = img.astype(np.uint8)
+
         if self.saturization != 1.0 or self.hue_rotation_angle != 0:
             # convert the image to HSV
             img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype(float)
@@ -345,7 +319,6 @@ class InputImageProcessor:
             # convert the image back to BGR
             img = cv2.cvtColor(img_hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
 
-        # Ensure the mask is returned in the expected format
         return img, human_seg_mask
 
 

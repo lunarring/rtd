@@ -49,7 +49,6 @@ import os
 import sys
 import cv2
 import socket
-from lunar_tools import utils as lt_utils
 
 from rtd.utils.compression_helpers import send_compressed
 
@@ -180,7 +179,7 @@ if __name__ == "__main__":
     
     # Initialize movie saver if saving output to file
     if do_save_diffusion_output_to_file:
-        movie_saver = lt.MovieSaver(video_file_path_output, fps=20)
+        movie_saver = lt.MovieSaver(video_file_path_output, fps=12)
     
     input_image_processor = InputImageProcessor(device=device)
     input_image_processor.set_flip(do_flip=True, flip_axis=1)
@@ -226,8 +225,6 @@ if __name__ == "__main__":
     fract_blend_embeds = 0.0
 
     frame_counter = -1
-
-
     while True:
         frame_counter += 1
         t_processing_start = time.time()
@@ -257,7 +254,7 @@ if __name__ == "__main__":
         do_optical_flow = do_postproc or do_opt_flow_seg
         # floats
         # nmb_inference_steps = meta_input.get(akai_midimix="B0", val_min=2, val_max=10.0, val_default=2.0)
-        nmb_inference_steps = 3
+        nmb_inference_steps = 6
         acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.0)
         acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.0)
         opt_flow_threshold = meta_input.get(akai_lpd8="E2", akai_midimix="E2", val_min=0, val_max=2, val_default=1)
@@ -332,13 +329,7 @@ if __name__ == "__main__":
         postproc_func_coef1 = 0.5 # meta_input.get(akai_lpd8="H0", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
         postproc_func_coef2 = 0.5 # meta_input.get(akai_lpd8="H1", akai_midimix="G2", val_min=0, val_max=1, val_default=0.5)
         postproc_mod_button1 = meta_input.get(akai_midimix="G4", button_mode="toggle", val_default=True)
-        
-        # Update the posteffect processor with the current wave parameters
-        # if hasattr(posteffect_processor, 'wave_amplitude'):
-        #     posteffect_processor.wave_amplitude = wave_amplitude
-        #     posteffect_processor.wave_frequency = wave_frequency
-        #     posteffect_processor.wave_speed = wave_speed
-
+        #postproc_mod_button1 = True
         #  oscillator-based control
         if do_param_oscillators:
             do_cycle_prompt_from_file = oscillator.get("prompt_cycle", 60, 0, 1, "trigger")
@@ -446,30 +437,8 @@ if __name__ == "__main__":
         input_image_processor.set_opt_flow_threshold(opt_flow_threshold)
         img_proc, human_seg_mask = input_image_processor.process(img_cam, opt_flow)
 
-        # Ensure we have a valid mask
-        if human_seg_mask is None:
-            # Create a default mask if none was returned
-            human_seg_mask = np.ones((img_proc.shape[0], img_proc.shape[1]), dtype=np.float32)
-        elif not do_human_seg and not do_opt_flow_seg:
-            # Override with all ones mask when segmentation is disabled
-            human_seg_mask = np.ones((img_proc.shape[0], img_proc.shape[1]), dtype=np.float32)
-        elif human_seg_mask.ndim == 3:
-            # Convert 3-channel mask to single channel
-            human_seg_mask = human_seg_mask[:,:,0].astype(np.float32)
-            if human_seg_mask.max() > 1.0:  # If in range 0-255, normalize to 0-1
-                human_seg_mask = human_seg_mask / 255.0
-        
-        # Ensure mask dimensions match the processed image
-        if human_seg_mask.shape[:2] != img_proc.shape[:2]:
-            print(f"Warning: Mask shape {human_seg_mask.shape[:2]} doesn't match image shape {img_proc.shape[:2]}. Resizing mask.")
-            human_seg_mask = cv2.resize(
-                human_seg_mask, 
-                (img_proc.shape[1], img_proc.shape[0]), 
-                interpolation=cv2.INTER_LINEAR
-            )
-            # Keep mask binary if it was binary
-            if np.all(np.logical_or(human_seg_mask < 0.1, human_seg_mask > 0.9)):
-                human_seg_mask = (human_seg_mask > 0.5).astype(np.float32)
+        if not do_human_seg and not do_opt_flow_seg:
+            human_seg_mask = np.ones_like(img_proc).astype(np.float32)  # / 255
 
         fps_tracker.start_segment("Acid")
         # Acid
@@ -510,18 +479,19 @@ if __name__ == "__main__":
                     dynamic_processor.delete_current_fn_func()
                 img_proc = dynamic_processor.process(
                     np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
-                    human_seg_mask.astype(np.float32),
+                    human_seg_mask.astype(np.float32) / 255,
                     opt_flow,
                     postproc_func_coef1,
                 )
                 update_img = np.clip(img_proc, 0, 255).astype(np.uint8)
                 output_to_render = update_img
+
             else:
                 fps_tracker.start_segment("Postproc")
                 if opt_flow is not None:
                     output_to_render, update_img = posteffect_processor.process(
                         img_diffusion,
-                        human_seg_mask.astype(np.float32),
+                        human_seg_mask.astype(np.float32) / 255,
                         opt_flow,
                         postproc_func_coef1,
                         postproc_func_coef2,
