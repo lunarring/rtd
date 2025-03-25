@@ -49,6 +49,7 @@ import os
 import sys
 import cv2
 import socket
+from lunar_tools import utils as lt_utils
 
 from rtd.utils.compression_helpers import send_compressed
 
@@ -125,8 +126,9 @@ if __name__ == "__main__":
     do_enable_dynamic_processor = False
     do_send_to_touchdesigner = False
     do_load_cam_input_from_file = False
-    do_save_diffusion_output_to_file = True
-    video_file_path_input = "materials/videos/long_cut.mp4"
+    do_save_diffusion_output_to_file = False
+    video_file_path_input = get_repo_path("materials/videos/long.mp4")
+    print(video_file_path_input)
     video_file_path_output = "materials/videos/long_cut_diffusion2.mp4"
 
 
@@ -169,8 +171,8 @@ if __name__ == "__main__":
         backend="opencv",
         do_fullscreen=do_fullscreen,
     )
-    cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=2)
-    cam.do_mirror = True
+    cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=0)
+    cam.do_mirror = False
     
     # Initialize movie reader if loading from file
     if do_load_cam_input_from_file:
@@ -178,7 +180,7 @@ if __name__ == "__main__":
     
     # Initialize movie saver if saving output to file
     if do_save_diffusion_output_to_file:
-        movie_saver = lt.MovieSaver(video_file_path_output, fps=12)
+        movie_saver = lt.MovieSaver(video_file_path_output, fps=20)
     
     input_image_processor = InputImageProcessor(device=device)
     input_image_processor.set_flip(do_flip=True, flip_axis=1)
@@ -203,7 +205,10 @@ if __name__ == "__main__":
     )
     speech_detector = lt.Speech2Text()
     prompt_provider_mic = PromptProviderMicrophone(init_prompt="A beautiful landscape")
-    prompt_provider_txt_file = PromptProviderTxtFile(get_repo_path("materials/prompts/good_prompts_wl_community.txt", __file__))
+    prompt_provider_txt_file = PromptProviderTxtFile(
+        get_repo_path("materials/prompts/gosia_poetry.txt", __file__),
+        mode="sequential"  # Can be "random" or "sequential"
+    )
     opt_flow_estimator = OpticalFlowEstimator(use_ema=False)
 
     posteffect_processor = Posteffect()
@@ -221,12 +226,16 @@ if __name__ == "__main__":
     fract_blend_embeds = 0.0
 
     frame_counter = -1
+
+
     while True:
         frame_counter += 1
         t_processing_start = time.time()
         # bools
         new_prompt_mic_unmuter = meta_input.get(akai_lpd8="A1", akai_midimix="A3", button_mode="held_down")
-        prompt_transition_time = meta_input.get(akai_lpd8="G1", akai_midimix="A1", val_min=1, val_max=20, val_default=8.0)
+  
+        hue_rotation = meta_input.get(akai_midimix="A1", val_min=0, val_max=180, val_default=0)
+        prompt_transition_time = meta_input.get(akai_lpd8="G1", akai_midimix="A2", val_min=1, val_max=50, val_default=8.0)
         do_cycle_prompt_from_file = meta_input.get(akai_lpd8="C0", akai_midimix="A4", button_mode="pressed_once")
 
         dyn_prompt_mic_unmuter = False # meta_input.get(akai_lpd8="A0", akai_midimix="B3", button_mode="held_down")
@@ -248,7 +257,7 @@ if __name__ == "__main__":
         do_optical_flow = do_postproc or do_opt_flow_seg
         # floats
         # nmb_inference_steps = meta_input.get(akai_midimix="B0", val_min=2, val_max=10.0, val_default=2.0)
-        nmb_inference_steps = 6
+        nmb_inference_steps = 3
         acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.0)
         acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.0)
         opt_flow_threshold = meta_input.get(akai_lpd8="E2", akai_midimix="E2", val_min=0, val_max=2, val_default=1)
@@ -259,7 +268,7 @@ if __name__ == "__main__":
         if zoom_in_factor * zoom_out_factor == 0:
             zoom_factor = 1 - zoom_in_factor + zoom_out_factor
         else:
-            zoom_factor = 1 + oscillator.get("zoom_factor", 1./(3*zoom_in_factor), zoom_out_factor, -zoom_out_factor, "continuous")
+            zoom_factor = 1 + oscillator.get("zoom_factor", 1./(0.2*zoom_in_factor), zoom_out_factor, -zoom_out_factor, "continuous")
 
         
         # X shift with oscillation when both directions are active
@@ -268,7 +277,7 @@ if __name__ == "__main__":
         if x_shift_left * x_shift_right == 0:
             x_shift = int(x_shift_right - x_shift_left)
         else:
-            x_shift = int(oscillator.get("x_shift", 1./(3*x_shift_right), x_shift_left, -x_shift_right, "continuous"))
+            x_shift = int(oscillator.get("x_shift", 1./(0.5*x_shift_right), x_shift_left, -x_shift_right, "continuous"))
 
         
         # Y shift with oscillation when both directions are active
@@ -277,7 +286,7 @@ if __name__ == "__main__":
         if y_shift_up * y_shift_down == 0:
             y_shift = int(y_shift_down - y_shift_up)
         else:
-            y_shift = int(oscillator.get("y_shift", 1./(3*y_shift_down), y_shift_up, -y_shift_down, "continuous"))
+            y_shift = int(oscillator.get("y_shift", 1./(0.5*y_shift_down), y_shift_up, -y_shift_down, "continuous"))
 
         
         # Rotation with oscillation when both directions are active
@@ -286,10 +295,10 @@ if __name__ == "__main__":
         if rotation_left * rotation_right == 0:
             rotation_angle = rotation_right - rotation_left
         else:
-            rotation_angle = oscillator.get("rotation_angle", 1./(3*rotation_right), rotation_left, -rotation_right, "continuous")
+            rotation_angle = oscillator.get("rotation_angle", 1./(0.5*rotation_right), rotation_left, -rotation_right, "continuous")
 
         
-        color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="D0", val_min=0, val_max=1, val_default=0.5)
+        color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="B0", val_min=0, val_max=1, val_default=0.5)
         brightness = meta_input.get(akai_midimix="A0", val_min=0.0, val_max=2, val_default=1.0)
         # Add latent acid strength parameter
         #latent_acid_strength = meta_input.get(akai_midimix="D1", val_min=0, val_max=1.0, val_default=0.0)
@@ -298,7 +307,7 @@ if __name__ == "__main__":
         # Modulation controls
         # mod_samp = meta_input.get(akai_midimix="F2", val_min=0, val_max=10, val_default=0)
         mod_samp = 0
-        mod_emb = meta_input.get(akai_midimix="F1", val_min=0, val_max=10, val_default=2)
+        mod_emb = meta_input.get(akai_midimix="B1", val_min=0, val_max=10, val_default=2)
 
         # Set up modulations dictionary
         modulations["modulations_noise"] = modulations_noise
@@ -323,7 +332,7 @@ if __name__ == "__main__":
         postproc_func_coef1 = 0.5 # meta_input.get(akai_lpd8="H0", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
         postproc_func_coef2 = 0.5 # meta_input.get(akai_lpd8="H1", akai_midimix="G2", val_min=0, val_max=1, val_default=0.5)
         postproc_mod_button1 = meta_input.get(akai_midimix="G4", button_mode="toggle", val_default=True)
-
+        # postproc_mod_button1 = True
         #  oscillator-based control
         if do_param_oscillators:
             do_cycle_prompt_from_file = oscillator.get("prompt_cycle", 60, 0, 1, "trigger")
