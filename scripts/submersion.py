@@ -119,6 +119,7 @@ if __name__ == "__main__":
     n_frame_interpolations: int = 5
     shape_hw_cam = (576, 1024)
     shape_hw_cam = (1080, 1920)
+    shape_hw_cam = (648, 1152)
 
     touchdesigner_host = "192.168.100.101"  # Change to your TouchDesigner machine's IP
     touchdesigner_port = 9998
