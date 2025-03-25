@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 import time
 import lunar_tools as lt
 import random
+import numpy as np
 
 
 class PromptProvider(ABC):
@@ -89,44 +90,87 @@ class PromptProviderMicrophone(PromptProvider):
         return self.speech_detector.handle_unmute_button(mic_button_state)
 
 
-class PromptProviderTxtFile(PromptProvider):
-    """
-    A prompt provider that gets prompts from a text file.
-    This is just an example implementation.
-    """
+class PromptProviderTxtFile:
+    def __init__(self, txt_file_path, mode="random"):
+        """
+        Initialize a prompt provider that reads prompts from a text file.
+        
+        Args:
+            txt_file_path (str): Path to the text file containing prompts.
+            mode (str): Mode for selecting prompts - "random" or "sequential". Default is "random".
+        """
+        self.txt_file_path = txt_file_path
+        self.mode = mode
+        self.prompts = []
+        self.current_prompt = ""
+        self.current_index = 0  # Track current position for sequential mode
+        
+        # Validate mode
+        if mode not in ["random", "sequential"]:
+            print(f"Warning: Unknown mode '{mode}'. Falling back to 'random' mode.")
+            self.mode = "random"
+        
+        # Read prompts from file
+        self.reload_prompts()
+        
+        # Initialize with a prompt
+        self.get_next_prompt()
 
-    def __init__(self, file_path: str):
-        super().__init__("picture of a cat")
-        self._file_path = file_path
+    def reload_prompts(self):
+        """
+        Reload prompts from the text file.
+        """
         try:
-            self.load_prompts()
-            self._current_prompt = self.list_prompts[0] if self.list_prompts else "picture of a cat"
-        except FileNotFoundError:
-            print(f"Warning: Prompt file not found at {file_path}. Using default prompt.")
-            self.list_prompts = ["picture of a cat"]
-            self._current_prompt = "picture of a cat"
+            with open(self.txt_file_path, "r") as f:
+                self.prompts = [l.strip() for l in f.readlines() if len(l.strip()) > 0]
+            # For sequential mode, reset the index
+            if self.mode == "sequential":
+                self.current_index = 0
         except Exception as e:
-            print(f"Error loading prompts from {file_path}: {e}")
-            self.list_prompts = ["picture of a cat"]
-            self._current_prompt = "picture of a cat"
+            print(f"Error loading prompts from {self.txt_file_path}: {e}")
+            self.prompts = ["A beautiful landscape"]  # Fallback prompt
 
-    def load_prompts(self):
-        with open(self._file_path, "r", encoding="utf-8") as file:
-            self.list_prompts = [line.strip() for line in file.readlines() if line.strip()]
-            if not self.list_prompts:
-                print(f"Warning: No prompts found in {self._file_path}. Using default prompt.")
-                self.list_prompts = ["picture of a cat"]
+    def get_next_prompt(self):
+        """
+        Get the next prompt according to the current mode.
+        
+        Returns:
+            str: The next prompt.
+        """
+        if not self.prompts:
+            return "A beautiful landscape"  # Fallback if no prompts are available
+        
+        if self.mode == "random":
+            # Random mode: select a random prompt
+            self.current_prompt = np.random.choice(self.prompts)
+        else:  # sequential mode
+            # Sequential mode: go through prompts in order
+            self.current_prompt = self.prompts[self.current_index]
+            # Move to next prompt, cycling back to the beginning if needed
+            self.current_index = (self.current_index + 1) % len(self.prompts)
+            
+        return self.current_prompt
 
-    def handle_prompt_cycling_button(self, cycle_prompt_button_state: bool):
+    def get_current_prompt(self):
         """
-        Get a random prompt from the list of prompts.
+        Get the currently selected prompt.
+        
+        Returns:
+            str: The current prompt.
         """
-        if cycle_prompt_button_state:
-            random_index = random.randint(0, len(self.list_prompts) - 1)
-            self._current_prompt = self.list_prompts[random_index]
+        return self.current_prompt
 
-    def get_current_prompt(self) -> str | bool:
+    def handle_prompt_cycling_button(self, button_pressed):
         """
-        Get the current prompt.
+        Handle the button press to cycle to the next prompt.
+        
+        Args:
+            button_pressed (bool): Whether the button to cycle prompts was pressed.
+            
+        Returns:
+            bool: True if a new prompt was selected, False otherwise.
         """
-        return self._current_prompt
+        if button_pressed:
+            self.get_next_prompt()
+            return True
+        return False
