@@ -332,7 +332,13 @@ if __name__ == "__main__":
         postproc_func_coef1 = 0.5 # meta_input.get(akai_lpd8="H0", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
         postproc_func_coef2 = 0.5 # meta_input.get(akai_lpd8="H1", akai_midimix="G2", val_min=0, val_max=1, val_default=0.5)
         postproc_mod_button1 = meta_input.get(akai_midimix="G4", button_mode="toggle", val_default=True)
-        # postproc_mod_button1 = True
+        
+        # Update the posteffect processor with the current wave parameters
+        # if hasattr(posteffect_processor, 'wave_amplitude'):
+        #     posteffect_processor.wave_amplitude = wave_amplitude
+        #     posteffect_processor.wave_frequency = wave_frequency
+        #     posteffect_processor.wave_speed = wave_speed
+
         #  oscillator-based control
         if do_param_oscillators:
             do_cycle_prompt_from_file = oscillator.get("prompt_cycle", 60, 0, 1, "trigger")
@@ -510,7 +516,6 @@ if __name__ == "__main__":
                 )
                 update_img = np.clip(img_proc, 0, 255).astype(np.uint8)
                 output_to_render = update_img
-
             else:
                 fps_tracker.start_segment("Postproc")
                 if opt_flow is not None:
