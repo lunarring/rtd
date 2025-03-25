@@ -130,10 +130,10 @@ if __name__ == "__main__":
     do_enable_dynamic_processor = False
     do_send_to_touchdesigner = False
     do_load_cam_input_from_file = False
-    do_save_diffusion_output_to_file = False
+    do_save_diffusion_output_to_file = True
     video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
     print(video_file_path_input)
-    video_file_path_output = "materials/videos/long_cut_diffusion2.mp4"
+    video_file_path_output = "materials/videos/gosia_diffusion.mp4"
 
 
     device = "cuda:0"
@@ -184,7 +184,7 @@ if __name__ == "__main__":
     
     # Initialize movie saver if saving output to file
     if do_save_diffusion_output_to_file:
-        movie_saver = lt.MovieSaver(video_file_path_output, fps=20)
+        movie_saver = lt.MovieSaver(video_file_path_output, fps=15)
     
     input_image_processor = InputImageProcessor(device=device)
     input_image_processor.set_flip(do_flip=True, flip_axis=1)
@@ -210,7 +210,7 @@ if __name__ == "__main__":
     speech_detector = lt.Speech2Text()
     prompt_provider_mic = PromptProviderMicrophone(init_prompt="A beautiful landscape")
     prompt_provider_txt_file = PromptProviderTxtFile(
-        get_repo_path("materials/prompts/gosia_poetry.txt", __file__),
+        get_repo_path("materials/prompts/gosia_poetry2.txt", __file__),
         mode="sequential"  # Can be "random" or "sequential"
     )
     opt_flow_estimator = OpticalFlowEstimator(use_ema=False)
@@ -261,7 +261,7 @@ if __name__ == "__main__":
         do_optical_flow = do_postproc or do_opt_flow_seg
         # floats
         # nmb_inference_steps = meta_input.get(akai_midimix="B0", val_min=2, val_max=10.0, val_default=2.0)
-        nmb_inference_steps = 3
+        nmb_inference_steps = 4
         acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.0)
         acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.0)
         opt_flow_threshold = meta_input.get(akai_lpd8="E2", akai_midimix="E2", val_min=0, val_max=2, val_default=1)
