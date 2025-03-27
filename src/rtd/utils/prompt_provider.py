@@ -9,6 +9,7 @@ import numpy as np
 import logging
 import threading
 import argparse
+from signal import signal, SIGINT
 
 # Import from RTD modules
 from rtd.voice.speech_to_text_streaming import SpeechToTextStreamer
@@ -56,9 +57,10 @@ class PromptProvider(ABC):
             str: The new prompt if one is available and different
             bool: False if no new prompt is available or same as last prompt
         """
+        current_prompt = self.get_current_prompt()
 
-        if self._current_prompt and self._current_prompt != self._last_prompt:
-            self._last_prompt = self._current_prompt
+        if current_prompt and current_prompt != self._last_prompt:
+            self._last_prompt = current_prompt
             self._last_prompt_time = time.time()
             return True
         else:
@@ -99,115 +101,6 @@ class PromptProviderMicrophone(PromptProvider):
 
     def handle_unmute_button(self, mic_button_state: bool):
         return self.speech_detector.handle_unmute_button(mic_button_state)
-
-
-class PromptProviderSpeechToText(PromptProvider):
-    """
-    A prompt provider that uses advanced speech-to-text streaming with LLM.
-    This provider captures speech via microphone, transcribes it using OpenAI,
-    and processes the transcription with an LLM to generate creative prompts.
-    """
-
-    def __init__(
-        self,
-        init_prompt: str = "Image of a cat",
-        use_llm: bool = True,
-        llm_model: str = "gpt-4o",
-        system_prompt: str = (
-            "Convert the user's speech into concise, vivid image generation prompts. "
-            "Focus on visual elements and artistic style. Keep it under 20 words."
-        ),
-        max_tokens: int = 100,
-        temperature: float = 0.7,
-        min_words: int = 3,
-        max_words: int = 30,
-        audio_file: str = None,
-        min_time_passed: float = 1.0,
-        check_interval: float = 0.1,
-    ):
-        """
-        Initialize the speech-to-text prompt provider.
-
-        Args:
-            init_prompt (str): Initial prompt to use
-            use_llm (bool): Whether to use LLM processing on transcriptions
-            llm_model (str): LLM model to use for processing
-            system_prompt (str): System prompt for the LLM
-            max_tokens (int): Maximum tokens for LLM responses
-            temperature (float): LLM temperature setting
-            min_words (int): Minimum words required for processing
-            max_words (int): Maximum words to consider from transcripts
-            audio_file (str): Optional audio file path instead of microphone
-            min_time_passed (float): Minimum time between transcript checks
-            check_interval (float): How often to check for updates (seconds)
-        """
-        super().__init__(init_prompt)
-
-        # Set up the STT streamer with LLM capabilities
-        self.streamer = SpeechToTextStreamer(
-            use_llm=use_llm,
-            llm_model=llm_model,
-            llm_system_prompt=system_prompt,
-            llm_max_tokens=max_tokens,
-            llm_temperature=temperature,
-            llm_min_words=min_words,
-            llm_max_words=max_words,
-            audio_file=audio_file,
-            min_time_passed=min_time_passed,
-        )
-
-        # Additional settings
-        self.check_interval = check_interval
-        self.running = True
-        self.lock = threading.Lock()
-
-        # Start the monitor thread to check for new prompts
-        self.monitor_thread = threading.Thread(target=self._monitor_for_new_prompts, daemon=True)
-        self.monitor_thread.start()
-
-        logger.info("Speech-to-Text prompt provider initialized")
-
-    def get_current_prompt(self) -> str | bool:
-        """
-        Get the current prompt from the LLM-processed transcription.
-
-        Returns:
-            str: The current prompt
-            bool: False if no prompt is available
-        """
-        return self._current_prompt
-
-    def _monitor_for_new_prompts(self):
-        """
-        Background thread that monitors for new LLM responses
-        and updates the current prompt when available.
-        """
-        while self.running:
-            # Check for new LLM responses
-            if self.streamer.is_new_llm_response():
-                llm_response = self.streamer.get_llm_response()
-                if llm_response:
-                    with self.lock:
-                        self._current_prompt = llm_response
-                    logger.info(f"New prompt from LLM: {llm_response}")
-
-            # If no LLM is used, check for direct transcriptions
-            elif not self.streamer.use_llm and self.streamer.is_new_transcript():
-                transcript = self.streamer.get_transcript()
-                if transcript:
-                    with self.lock:
-                        self._current_prompt = transcript
-                    logger.info(f"New prompt from transcript: {transcript}")
-
-            time.sleep(self.check_interval)
-
-    def stop(self):
-        """Stop all processing threads and cleanup resources."""
-        self.running = False
-        self.streamer.stop_all()
-        if self.monitor_thread.is_alive():
-            self.monitor_thread.join(timeout=2)
-        logger.info("Speech-to-Text prompt provider stopped")
 
 
 class PromptProviderTxtFile:
@@ -297,148 +190,119 @@ class PromptProviderTxtFile:
         return False
 
 
-if __name__ == "__main__":
-    import time
+class PromptProviderSpeechToText(PromptProvider):
+    """
+    A prompt provider that uses advanced speech-to-text streaming with LLM.
+    This provider captures speech via microphone, transcribes it using OpenAI,
+    and processes the transcription with an LLM to generate creative prompts.
+    """
 
-    # Parse command-line arguments
-    parser = argparse.ArgumentParser(description="Speech-to-Text Prompt Provider Example")
-    parser.add_argument("--demo", action="store_true", help="Run in demo mode with simulated speech")
-    parser.add_argument("--model", type=str, default="gpt-4o", help="LLM model to use")
-    args = parser.parse_args()
+    def __init__(
+        self,
+        init_prompt: str = "Image of a cat",
+        use_llm: bool = True,
+        llm_model: str = "gpt-4o",
+        llm_system_prompt: str = (
+            "Convert the user's speech into concise, vivid image generation prompts. "
+            "Focus on visual elements and artistic style. Keep it under 20 words."
+        ),
+        max_tokens: int = 100,
+        temperature: float = 0.7,
+        min_words: int = 3,
+        max_words: int = 30,
+        audio_file: str = None,
+        min_time_passed: float = 1.0,
+        check_interval: float = 0.1,
+    ):
+        """
+        Initialize the speech-to-text prompt provider.
 
-    print("Starting Speech-to-Text Prompt Provider Example")
+        Args:
+            init_prompt (str): Initial prompt to use
+            use_llm (bool): Whether to use LLM processing on transcriptions
+            llm_model (str): LLM model to use for processing
+            llm_system_prompt (str): System prompt for the LLM
+            max_tokens (int): Maximum tokens for LLM responses
+            temperature (float): LLM temperature setting
+            min_words (int): Minimum words required for processing
+            max_words (int): Maximum words to consider from transcripts
+            audio_file (str): Optional audio file path instead of microphone
+            min_time_passed (float): Minimum time between transcript checks
+            check_interval (float): How often to check for updates (seconds)
+        """
+        super().__init__(init_prompt)
 
-    if args.demo:
-        # Demo mode with simulated speech transcripts
-        print("Running in DEMO MODE with simulated speech transcripts")
-
-        # Create a simple class to simulate speech transcripts
-        class SimulatedSpeechToTextStreamer:
-            def __init__(self, *args, **kwargs):
-                self.demo_transcripts = [
-                    "a sunset over the ocean with silhouettes of palm trees",
-                    "a futuristic city with flying cars and neon lights",
-                    "a peaceful mountain landscape with a cabin and a lake",
-                    "an ancient forest with mystical creatures and glowing plants",
-                    "a busy marketplace in a medieval town",
-                ]
-                self.demo_responses = [
-                    "Silhouettes of palm trees against vibrant sunset over infinite ocean",
-                    "Neon-lit metropolis with sleek hovering vehicles cutting through skyscrapers",
-                    "Serene log cabin beside crystal mountain lake reflecting snow-capped peaks",
-                    "Ethereal woodland where luminous flora illuminates mythical beings",
-                    "Medieval marketplace bustling with merchants, flags and ancient architecture",
-                ]
-                self.current_index = 0
-                self.new_response = False
-                self.use_llm = True
-
-            def is_new_transcript(self, *args, **kwargs):
-                # Only return True once
-                return False
-
-            def is_new_llm_response(self):
-                # Alternate between True and False to simulate new responses
-                if self.current_index < len(self.demo_responses) and not self.new_response:
-                    self.new_response = True
-                    return True
-                return False
-
-            def get_transcript(self, *args, **kwargs):
-                return self.demo_transcripts[self.current_index]
-
-            def get_llm_response(self):
-                response = self.demo_responses[self.current_index]
-                self.new_response = False
-                self.current_index = (self.current_index + 1) % len(self.demo_responses)
-                return response
-
-            def stop_all(self):
-                print("Stopping simulated streamer...")
-
-        # Create a demo version that uses the simulation
-        class DemoPromptProvider(PromptProviderSpeechToText):
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
-                # Replace the streamer with our simulated one
-                self.streamer = SimulatedSpeechToTextStreamer()
-
-            def _monitor_for_new_prompts(self):
-                """Override to add delays between simulated responses"""
-                while self.running:
-                    # Check for new LLM responses
-                    if self.streamer.is_new_llm_response():
-                        llm_response = self.streamer.get_llm_response()
-                        if llm_response:
-                            with self.lock:
-                                self._current_prompt = llm_response
-                            logger.info(f"New prompt from LLM: {llm_response}")
-                            # Simulate "thinking" for user demo
-                            print(f"\n[Demo] Simulated transcript: {self.streamer.get_transcript()}")
-                            print(f"[Demo] Processing with LLM...", end="", flush=True)
-                            time.sleep(1)
-                            print(".", end="", flush=True)
-                            time.sleep(1)
-                            print(".", end="", flush=True)
-                            time.sleep(1)
-                            print(f" done!")
-                    time.sleep(3)  # Longer delay for demo mode
-
-        # Use the demo provider
-        speech_provider = DemoPromptProvider(init_prompt="Welcome to the demo", llm_model=args.model)
-
-    else:
-        # Live mode with actual microphone
-        print("Running with LIVE microphone input")
-        print("Make sure your OpenAI API key is set in the environment")
-
-        # Create the real speech-to-text prompt provider
-        speech_provider = PromptProviderSpeechToText(
-            init_prompt="Describe what you see around you",
-            use_llm=True,
-            llm_model=args.model,
-            system_prompt=(
-                "Transform the user's description into an artistic image prompt. "
-                "Focus on visual elements, mood, lighting, and style. "
-                "Keep it concise but vivid, under a maximum of 20 words."
-            ),
-            max_tokens=50,
-            temperature=0.7,
+        # Set up the STT streamer with LLM capabilities
+        self.streamer = SpeechToTextStreamer(
+            use_llm=use_llm,
+            llm_model=llm_model,
+            llm_system_prompt=llm_system_prompt,
+            llm_max_tokens=max_tokens,
+            llm_temperature=temperature,
+            llm_min_words=min_words,
+            llm_max_words=max_words,
+            audio_file=audio_file,
+            min_time_passed=min_time_passed,
         )
 
+    def get_current_prompt(self) -> str | bool:
+        """
+        Get the current prompt from the LLM processed speech-to-text.
+
+        Returns:
+            str: The current LLM-processed prompt if available
+            bool: False if no prompt is available
+        """
+        response = self.streamer.get_llm_response()
+        if response:
+            return response
+        return False
+
+    def new_prompt_available(self):
+        new_prompt_available = self.streamer.is_new_llm_response()
+        if new_prompt_available:
+            self._last_prompt = self.streamer.get_llm_response()
+        return new_prompt_available
+
+
+if __name__ == "__main__":
+
+    def signal_handler(sig, frame):
+        print("\nExiting...")
+        exit(0)
+
+    signal(SIGINT, signal_handler)
+
+    print("Simple PromptProviderSpeechToText Example")
+    print("----------------------------------------")
+    print("This example will listen to your speech and convert it to image prompts.")
+    print("Speak clearly into your microphone.")
+    print("Press Ctrl+C to exit.")
+
+    # Create a speech-to-text prompt provider with default settings
+    stt_provider = PromptProviderSpeechToText(
+        init_prompt="A colorful sunset over mountains",
+        llm_system_prompt=("Convert speech to vivid image prompts. Focus on visual elements."),
+        temperature=0.8,
+    )
+
     try:
-        print("\n" + "=" * 50)
-        print("SPEECH-TO-TEXT PROMPT GENERATOR")
-        print("=" * 50)
-
-        if not args.demo:
-            print("Speak into your microphone to generate prompts.")
-        print("Press Ctrl+C to exit.")
-        print("=" * 50 + "\n")
-
-        # Main loop to check for new prompts
-        prompt_count = 0
+        print(f"Initial prompt: {stt_provider._current_prompt}")
+        print("Listening for speech... Speak now!")
 
         while True:
-            if speech_provider.new_prompt_available():
-                prompt = speech_provider.last_prompt
-                prompt_count += 1
-                print(f"\n✨ NEW PROMPT #{prompt_count}: {prompt}")
+            # Check if there's a new prompt available
+            if stt_provider.new_prompt_available():
+                prompt = stt_provider.last_prompt
+                print(f"\nNew prompt generated: {prompt}")
 
-                # Give visual separation for next prompt
-                print("\n" + "-" * 50)
-
-            # Wait a bit before checking again
-            time.sleep(0.5)
-
-            # For demo mode, exit after showing all examples
-            if args.demo and prompt_count >= 5:
-                print("\nDemo completed with all examples shown.")
-                break
+            # Small delay to prevent high CPU usage
+            time.sleep(0.2)
 
     except KeyboardInterrupt:
-        print("\nStopping prompt provider...")
+        print("\nExiting...")
+    except Exception as e:
+        print(f"\nError: {e}")
     finally:
-        # Clean up resources
-        speech_provider.stop()
-        print("\nExample completed. Thank you for trying the Speech-to-Text Prompt Provider!")
+        # Cleanup code could go here if needed
+        print("Example completed.")
