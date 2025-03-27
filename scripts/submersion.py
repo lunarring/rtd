@@ -127,9 +127,9 @@ if __name__ == "__main__":
     do_fullscreen = True
     do_enable_dynamic_processor = False
     do_send_to_touchdesigner = False
-    do_load_cam_input_from_file = False
+    do_load_cam_input_from_file = True
     do_save_diffusion_output_to_file = False
-    video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
+    video_file_path_input = get_repo_path("materials/videos/long_cut.mp4")
     print(video_file_path_input)
     video_file_path_output = "materials/videos/long_cut_diffusion2.mp4"
 
@@ -149,7 +149,8 @@ if __name__ == "__main__":
     # init_prompt = 'Trippy and colorful long neon forest leaves and folliage fractal merging'
     init_prompt = "Dancing people full of glowing neon nerve fibers and filamenets"
     # init_prompt = "glowing digital fire full of glitches and neon matrix powerful fire glow and plasma"
-    init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
+    # init_prompt = "glowing digital fire full of glitches and neon matrix powerful fire glow and plasma"
+    init_prompt = "The Metamorphosis of Time: Deep below, volcano’s asleep, pulsating rhythmically on the still mirror of the lake"
 
     meta_input = lt.MetaInput()
     de_img = DiffusionEngine(
@@ -242,6 +243,7 @@ if __name__ == "__main__":
         dyn_prompt_del_current = False  # meta_input.get(akai_midimix="F4", button_mode="released_once")
 
         do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="E3", button_mode="toggle", val_default=False)
+        do_motion_tracking_masking = meta_input.get(akai_midimix="D3", button_mode="toggle", val_default=False)
         do_acid_wobblers = False  # meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
         do_infrared_colorize = False  # meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
@@ -256,10 +258,10 @@ if __name__ == "__main__":
         # floats
         # nmb_inference_steps = meta_input.get(akai_midimix="B0", val_min=2, val_max=10.0, val_default=2.0)
         nmb_inference_steps = 2
-        acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.0)
-        acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.0)
+        acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.4)
+        acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.4)
         opt_flow_threshold = meta_input.get(akai_lpd8="E2", akai_midimix="E2", val_min=0, val_max=2, val_default=1)
-        coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=0.3, val_default=0.00)
+        coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=0.3, val_default=0.08)
         # zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H2", val_min=0.5, val_max=1.5, val_default=1.0)
         zoom_out_factor = meta_input.get(akai_lpd8="F1", akai_midimix="G5", val_min=0, val_max=0.05, val_default=0)
         zoom_in_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H5", val_min=0, val_max=0.05, val_default=0)
@@ -305,7 +307,7 @@ if __name__ == "__main__":
         # Modulation controls
         # mod_samp = meta_input.get(akai_midimix="F2", val_min=0, val_max=10, val_default=0)
         mod_samp = 0
-        mod_emb = meta_input.get(akai_midimix="B1", val_min=0, val_max=10, val_default=2)
+        mod_emb = meta_input.get(akai_midimix="B1", val_min=0, val_max=10, val_default=8)
 
         # Set up modulations dictionary
         modulations["modulations_noise"] = modulations_noise
@@ -328,11 +330,13 @@ if __name__ == "__main__":
 
         #  postproc control
         postproc_mod_button1 = meta_input.get(akai_midimix="G4", button_mode="toggle", val_default=True)
-        flow_gain = meta_input.get(akai_lpd8="D0", akai_midimix="D0", val_min=0, val_max=1, val_default=0.0)
-        reverb_gain = meta_input.get(akai_lpd8="D1", akai_midimix="D1", val_min=0, val_max=1, val_default=0.0)
-        background_image_gain = meta_input.get(akai_midimix="D2", val_min=0, val_max=1, val_default=0.0)
+
+        flow_gain = meta_input.get(akai_lpd8="D0", akai_midimix="D0", val_min=0, val_max=1, val_default=0.3)
+        reverb_gain = meta_input.get(akai_lpd8="D1", akai_midimix="D1", val_min=0, val_max=1, val_default=0.3)
+        background_image_gain = meta_input.get(akai_midimix="D2", val_min=0, val_max=1, val_default=0.6)
         # postproc_func_coef1 = 0.5
         # postproc_func_coef2 = 0.5
+
         # postproc_mod_button1 = True
         #  oscillator-based control
         if do_param_oscillators:
@@ -433,6 +437,7 @@ if __name__ == "__main__":
         fps_tracker.start_segment("InImg")
         # Start timing image processing
         input_image_processor.set_human_seg(do_human_seg)
+        input_image_processor.set_motion_tracking_masking(do_motion_tracking_masking)
         input_image_processor.set_opt_flow_seg(do_opt_flow_seg)
         input_image_processor.set_resizing_factor_humanseg(0.4)
         input_image_processor.set_blur(do_blur)
