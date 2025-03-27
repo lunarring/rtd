@@ -9,7 +9,6 @@ import lunar_tools as lt
 from PIL import Image
 from .infrared.colorize_infrared import ImageColorizationPipelineHF
 
-
 def img2tensor(tensor):
     """
     Converts a tensor to a numpy array.
@@ -144,7 +143,7 @@ class InputImageProcessor:
         do_blur=False,
         blur_kernel=3,
         do_infrared_colorize=False,
-        device="cuda",
+        device="cuda"
     ):
         self.device = device
         self.brightness = 1.0
@@ -157,10 +156,18 @@ class InputImageProcessor:
         #  image colorization model for infrared images
         self.infrared_colorizer = ImageColorizationPipelineHF()
 
+        # initialize motion tracking
+        try:
+            from motion.motion_tracking import MotionTracker
+            self.motion_tracker = MotionTracker()
+        except Exception as e:
+            print(f"MotionTracker not found! {e}. Motion tracking masking will not be applied.")
+        
         # human body segmentation
         self.human_seg = HumanSeg(
             resizing_factor=self.resizing_factor_humanseg, device=device, apply_smoothing=True, gaussian_kernel_size=9, gaussian_sigma=3
         )
+
         self.set_blur_size(self.blur_kernel)
 
         self.do_human_seg = do_human_seg
@@ -171,6 +178,7 @@ class InputImageProcessor:
         self.opt_flow_blur_kernel = (21, 21)
         self.opt_flow_blur_sigma = 5
         self.flip_axis = None
+        self.do_motion_tracking_masking = False
 
         self.list_history_frames = []
 
@@ -211,6 +219,9 @@ class InputImageProcessor:
 
     def set_opt_flow_threshold(self, threshold=1):
         self.opt_flow_threshold = threshold
+        
+    def set_motion_tracking_masking(self, do_motion_tracking_masking=True):
+        self.do_motion_tracking_masking = do_motion_tracking_masking
 
     def create_opt_flow_mask(self, opt_flow):
         """Create a mask from optical flow data."""
@@ -254,7 +265,10 @@ class InputImageProcessor:
 
         # Get human segmentation mask if enabled
         if self.do_human_seg:
-            human_seg_mask = self.human_seg.get_mask(img)
+            if self.do_motion_tracking_masking:
+                human_seg_mask = self.motion_tracker.return_mask(img)
+            else:
+                human_seg_mask = self.human_seg.get_mask(img)
 
         # Get optical flow mask if enabled
         if self.do_opt_flow_seg and opt_flow is not None:
