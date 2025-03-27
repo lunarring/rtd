@@ -149,7 +149,7 @@ if __name__ == "__main__":
     # init_prompt = 'Trippy and colorful long neon forest leaves and folliage fractal merging'
     init_prompt = "Dancing people full of glowing neon nerve fibers and filamenets"
     # init_prompt = "glowing digital fire full of glitches and neon matrix powerful fire glow and plasma"
-    # init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
+    init_prompt = 'Bizarre creature from Hieronymus Bosch painting "A Garden of Earthly Delights" on a schizophrenic ayahuasca trip'
 
     meta_input = lt.MetaInput()
     de_img = DiffusionEngine(
@@ -255,7 +255,7 @@ if __name__ == "__main__":
         do_optical_flow = do_postproc or do_opt_flow_seg
         # floats
         # nmb_inference_steps = meta_input.get(akai_midimix="B0", val_min=2, val_max=10.0, val_default=2.0)
-        nmb_inference_steps = 6
+        nmb_inference_steps = 2
         acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.0)
         acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.0)
         opt_flow_threshold = meta_input.get(akai_lpd8="E2", akai_midimix="E2", val_min=0, val_max=2, val_default=1)
