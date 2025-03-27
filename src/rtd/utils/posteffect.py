@@ -50,6 +50,8 @@ class Posteffect():
         
         # Load and convert to tensor
         particle_img_np = np.array(Image.open(image_path)).astype(np.float32)
+        # set to solid color
+        particle_img_np[:,:,:] = 228
         self.current_particle_tensor = torch.tensor(particle_img_np, device=self.device, dtype=torch.float32)
         
     def generate_smooth_random_field(self, height, width):
@@ -129,7 +131,7 @@ class Posteffect():
         return warped_img
 
     def process(self, img_diffusion, img_mask_segmentation, img_optical_flow,
-                mod_coef1, mod_coef2, mod_button1, sound_volume_modulation):
+                flow_gain, reverb_gain, background_image_gain, mod_button1, sound_volume_modulation):
         # Convert inputs to torch tensors; ensure they are float32 for processing.
         torch_img_diffusion = torch.tensor(np.asarray(img_diffusion), device=self.device, dtype=torch.float32)
         torch_img_mask_segmentation = torch.tensor(np.asarray(img_mask_segmentation), device=self.device, dtype=torch.float32)
@@ -162,8 +164,8 @@ class Posteffect():
         if self.accumulated_frame is None:
             self.accumulated_frame = torch_img_diffusion
 
-        # Apply modulation to the optical flow using mod_coef2.
-        modulated_flow = torch_img_optical_flow * mod_coef2 * 5
+        # Apply modulation to the optical flow using flow_gain.
+        modulated_flow = torch_img_optical_flow * flow_gain * 5
         
         # Add smooth random diffusion field if enabled with interpolation over 20 calls
         if self.use_diffusion_field:
@@ -182,7 +184,7 @@ class Posteffect():
                 self.diffusion_field_prev = self.diffusion_field_next
                 self.diffusion_field_next = self.generate_smooth_random_field(H, W)
                 self.diffusion_count = 0
-            modulated_flow = modulated_flow + diffusion_field
+            modulated_flow = modulated_flow + diffusion_field * flow_gain * 5
         
         # Warp the previous accumulated frame based on the modulated optical flow.
         warped_accum = self.warp_tensor(self.accumulated_frame, modulated_flow)
@@ -195,15 +197,15 @@ class Posteffect():
             # Use precomputed motion magnitude to calculate average motion.
             avg_motion = torch.mean(motion_magnitude)
             
-            # Use a sigmoid-like mapping to [0,1] range with sensitivity controlled by mod_coef1
-            motion_factor = mod_coef1 * 3 * avg_motion.item()
+            # Use a sigmoid-like mapping to [0,1] range with sensitivity controlled by reverb_gain
+            motion_factor = (1-reverb_gain) * 3 * avg_motion.item()
             motion_factor = np.clip(motion_factor, 0, 1)
             
             # Scale base_alpha by motion_factor
             effective_alpha = base_alpha * motion_factor
         else:
             # Original behavior when motion adaptive blend is disabled
-            effective_alpha = base_alpha * mod_coef1
+            effective_alpha = base_alpha * (1 - reverb_gain)
         
         # Compute the new accumulated frame with exponential moving average blend.
         output_to_render = effective_alpha * torch_img_diffusion + (1 - effective_alpha) * warped_accum
@@ -232,8 +234,8 @@ class Posteffect():
             particle_img = self.current_particle_tensor
             # Resize the particle image to match the dimensions of the diffusion image
             particle_img = lt.resize(particle_img[:,:,:3], size=(torch_img_diffusion.shape[0], torch_img_diffusion.shape[1]))
-            # Compute the flow for the particles using optical flow modulated by mod_coef2
-            particle_flow = torch_img_optical_flow * mod_coef2
+            # Compute the flow for the particles using optical flow modulated by flow_gain
+            particle_flow = torch_img_optical_flow * flow_gain
             if self.accumulated_warped_particle is None:
                 # Resample/displace the particle image using the optical flow
                 warped_particle = self.warp_tensor(particle_img, particle_flow)
@@ -255,13 +257,10 @@ class Posteffect():
                 norm_factor = 255.0 if torch.max(output_to_render) > 1.0 else 1.0
                 overall_brightness = torch.clamp(brightness / norm_factor, 0.0, 1.0).item()
 
-                brightness_limiter = 1 / (3 + overall_brightness*0.5)
+                brightness_limiter = 1 / (1.0 + overall_brightness*0.5)
 
-                #  limiter = mod_coef1 ** 2
-                limiter = mod_coef1
-                if limiter > 0.7:
-                    limiter = 0.7
-
+                #  limiter = reverb_gain ** 2
+                limiter = background_image_gain
                 warped_particle *= limiter * brightness_limiter
 
             self.accumulated_warped_particle = warped_particle

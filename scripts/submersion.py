@@ -323,9 +323,12 @@ if __name__ == "__main__":
         # dynamic_func_coef3 = meta_input.get(akai_midimix="F2", val_min=0, val_max=1, val_default=0.5)
 
         #  postproc control
-        postproc_func_coef1 = 0.5  # meta_input.get(akai_lpd8="H0", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
-        postproc_func_coef2 = 0.5  # meta_input.get(akai_lpd8="H1", akai_midimix="G2", val_min=0, val_max=1, val_default=0.5)
         postproc_mod_button1 = meta_input.get(akai_midimix="G4", button_mode="toggle", val_default=True)
+        flow_gain = meta_input.get(akai_lpd8="D0", akai_midimix="D0", val_min=0, val_max=1, val_default=0.0)
+        reverb_gain = meta_input.get(akai_lpd8="D1", akai_midimix="D1", val_min=0, val_max=1, val_default=0.0)
+        background_image_gain = meta_input.get(akai_midimix="D2", val_min=0, val_max=1, val_default=0.0)
+        # postproc_func_coef1 = 0.5  
+        #postproc_func_coef2 = 0.5  
         # postproc_mod_button1 = True
         #  oscillator-based control
         if do_param_oscillators:
@@ -494,8 +497,9 @@ if __name__ == "__main__":
                         img_diffusion,
                         hsm,
                         opt_flow,
-                        postproc_func_coef1,
-                        postproc_func_coef2,
+                        flow_gain,
+                        reverb_gain,
+                        background_image_gain,
                         postproc_mod_button1,
                         sound_volume,
                     )
