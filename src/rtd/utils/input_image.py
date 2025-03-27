@@ -8,7 +8,8 @@ from .segmentation_detection import HumanSeg
 import lunar_tools as lt
 from PIL import Image
 from .infrared.colorize_infrared import ImageColorizationPipelineHF
-from motion.motion_tracking import MotionTracker
+
+# from motion.motion_tracking import MotionTracker
 
 
 def img2tensor(tensor):

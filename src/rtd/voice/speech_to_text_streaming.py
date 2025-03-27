@@ -63,7 +63,7 @@ class SpeechToTextStreamer:
     def __init__(
         self,
         use_llm=True,
-        llm_model="gpt-3.5-turbo",
+        llm_model="gpt-4o-2024-08-06",
         llm_system_prompt="Describe the image in detail in vivid colors given what was said",
         llm_max_tokens=100,
         llm_temperature=0.7,
@@ -141,7 +141,7 @@ class SpeechToTextStreamer:
         settings = STTModelSettings(
             language="en",  # Force English language transcription
             # Configure turn detection (lower eagerness means wait longer)
-            turn_detection={"type": "semantic_vad", "eagerness": "high"},  # Options: high, medium, low
+            turn_detection={"type": "semantic_vad", "eagerness": "low"},  # Options: high, medium, low
             # Add prompt for English transcription
             prompt="Transcribe the following audio in English language only",
             temperature=0,  # Lower temperature for more deterministic results

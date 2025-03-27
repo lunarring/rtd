@@ -40,6 +40,7 @@ from rtd.utils.oscillators import Oscillator
 from rtd.utils.prompt_provider import (
     PromptProviderMicrophone,
     PromptProviderTxtFile,
+    PromptProviderSpeechToText,
 )
 from rtd.utils.misc_utils import get_repo_path
 import time
@@ -52,6 +53,35 @@ import cv2
 import socket
 
 from rtd.utils.compression_helpers import send_compressed
+
+vis_llm_prompt = """Your task is to directly translate from poetry into visual descriptions. I give you couple examples and you can do it then for the next one. Here are rules: Your task is to produce a valid and new output. Keep the style and length of the examples in your output. Don't make it longer. Stay within the theme of the examples!
+
+Input: The surface is not motionless. Output: Waves on the surface of endless blue ocean and flickering, silver light 
+Input: movement originates from the tides Output: regular movement of waves depends on the (invisible) underwater tides 
+Input: pulsations in the bloodstream Output: pulsating liquid flowing through a riverbed
+Input: it ripples, reflected on the surface Output: ripples on the surface of magma
+Input: First, there's an impulse, a vibration Output: impulse of kinetic energy turning into vibration of particles 
+Input: reflection of the waves on sand Output: pattern on the sand resembles the shape of a wave
+Input: dunes in slow-motion Output: grains of sand carried by the wind are forming dunes
+Input: birds respond to magnetic signals Output: flock of birds, lines of flight
+Input: reverberating , undulating shapes Output: undulating shapes in an empty space
+Input: marked on the sand, on the water, in the air Output: transforming fractal  patterns, green
+Input: inscribed into the bodies of the rocks Output: fossils and geological lines marked on the rocks
+Input: The Metamorphosis of Time Output: transformations of a celestial mass happening across deep time
+Input: on the still mirror of the lake Output: still lake hidden in a forest, glossy surface
+Input: whispers of a breeze, water spirits murmuring their songs Output: breeze moving a surface of water
+Input: break the stillness of the air Output: subtle frequencies disturbing the  air
+Input: based on frequencies and undulations of the sound Output: sound undulating in a void, bright light
+Input: the lullaby Output: silent landscape, starry sky
+Input: the poem from the past appearing suddenly in your memory Output: blurry image of a glacier
+Input: a turbulence Output: image of a gray sky, turbulence
+Input: Wind is hitting my skin and I imagine its waves spreading into a kaleidoscope of light Output: Wind blows spreading into a kaleidoscope of light
+Input: particles rolling on the surface Output:  l glass beads rolling on the surface of a petri dish
+Input: atoms crashing, constant annihilations and re-productions Output:  elements colliding and dispersing into atoms 
+Input: The Pattern of Movement, a ripple Output: trembling  pattern of movement in the kelp forest
+
+The next message I send you will be an Input, and you directly continue after 'Output:'
+"""
 
 
 class TouchDesignerSender:
@@ -129,7 +159,8 @@ if __name__ == "__main__":
     do_send_to_touchdesigner = False
     do_load_cam_input_from_file = True
     do_save_diffusion_output_to_file = False
-    video_file_path_input = get_repo_path("materials/videos/long_cut.mp4")
+    do_realtime_transcription = True
+    video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
     print(video_file_path_input)
     video_file_path_output = "materials/videos/long_cut_diffusion2.mp4"
 
@@ -173,7 +204,7 @@ if __name__ == "__main__":
         backend="opencv",
         do_fullscreen=do_fullscreen,
     )
-    cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=0)
+    cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=2)
     cam.do_mirror = False
 
     # Initialize movie reader if loading from file
@@ -206,7 +237,16 @@ if __name__ == "__main__":
         device=device,
     )
     speech_detector = lt.Speech2Text()
-    prompt_provider_mic = PromptProviderMicrophone(init_prompt="A beautiful landscape")
+
+    if do_realtime_transcription:
+        prompt_provider_stt = PromptProviderSpeechToText(
+            init_prompt="A beautiful water sea",
+            llm_system_prompt=(vis_llm_prompt),
+            temperature=0.3,
+        )
+    else:
+        prompt_provider_mic = PromptProviderMicrophone(init_prompt="A beautiful landscape")
+
     prompt_provider_txt_file = PromptProviderTxtFile(
         get_repo_path("materials/prompts/gosia_poetry.txt", __file__), mode="sequential"  # Can be "random" or "sequential"
     )
@@ -361,11 +401,17 @@ if __name__ == "__main__":
         #     print(f'dynamic processor is currently not compatible with compile mode')
         #     do_dynamic_processor = False
 
-        new_diffusion_prompt_available_from_mic = prompt_provider_mic.handle_unmute_button(new_prompt_mic_unmuter)
+        if not do_realtime_transcription:
+            new_diffusion_prompt_available_from_mic = prompt_provider_mic.handle_unmute_button(new_prompt_mic_unmuter)
 
-        if new_diffusion_prompt_available_from_mic:
-            current_prompt = prompt_provider_mic.get_current_prompt()
-            do_prompt_change = True
+            if new_diffusion_prompt_available_from_mic:
+                current_prompt = prompt_provider_mic.get_current_prompt()
+                do_prompt_change = True
+        else:
+            if prompt_provider_stt.new_prompt_available():
+                current_prompt = prompt_provider_stt.last_prompt
+                do_prompt_change = True
+
             # print(f"New prompt: {current_prompt}")
             # if do_diffusion:
             #     embeds = em.encode_prompt(current_prompt)

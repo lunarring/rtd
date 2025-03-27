@@ -201,7 +201,7 @@ class PromptProviderSpeechToText(PromptProvider):
         self,
         init_prompt: str = "Image of a cat",
         use_llm: bool = True,
-        llm_model: str = "gpt-4o",
+        llm_model: str = "gpt-4o-2024-08-06",
         llm_system_prompt: str = (
             "Convert the user's speech into concise, vivid image generation prompts. "
             "Focus on visual elements and artistic style. Keep it under 20 words."
