@@ -112,8 +112,8 @@ def get_sample_shape_unet(coord, noise_resolution_h, noise_resolution_w):
 
 
 if __name__ == "__main__":
-    height_diffusion = int((384 + 96) * 2.0)  # 12 * (384 + 96) // 8
-    width_diffusion = int((512 + 128) * 2.0)  # 12 * (512 + 128) // 8
+    height_diffusion = int((384 + 96) * 1.5)  # 12 * (384 + 96) // 8
+    width_diffusion = int((512 + 128) * 1.5)  # 12 * (512 + 128) // 8
     height_render = 1080
     width_render = 1920
     n_frame_interpolations: int = 5
@@ -261,8 +261,8 @@ if __name__ == "__main__":
         opt_flow_threshold = meta_input.get(akai_lpd8="E2", akai_midimix="E2", val_min=0, val_max=2, val_default=1)
         coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=0.3, val_default=0.00)
         # zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H2", val_min=0.5, val_max=1.5, val_default=1.0)
-        zoom_out_factor = meta_input.get(akai_lpd8="F1", akai_midimix="G5", val_min=0, val_max=0.3, val_default=0)
-        zoom_in_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H5", val_min=0, val_max=0.3, val_default=0)
+        zoom_out_factor = meta_input.get(akai_lpd8="F1", akai_midimix="G5", val_min=0, val_max=0.05, val_default=0)
+        zoom_in_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H5", val_min=0, val_max=0.05, val_default=0)
         if zoom_in_factor * zoom_out_factor == 0:
             zoom_factor = 1 - zoom_in_factor + zoom_out_factor
         else:
