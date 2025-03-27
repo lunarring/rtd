@@ -64,7 +64,7 @@ class SpeechToTextStreamer:
         self,
         use_llm=True,
         llm_model="gpt-3.5-turbo",
-        llm_system_prompt="Translate everything into German and just " "reply with translated text.",
+        llm_system_prompt="Describe the image in detail in vivid colors given what was said",
         llm_max_tokens=100,
         llm_temperature=0.7,
         llm_min_words=3,
@@ -326,6 +326,13 @@ class SpeechToTextStreamer:
                 self.all_transcriptions.append({"text": transcription, "timestamp": timestamp})
                 # Set flag when new transcript is available
                 self.new_transcript_available = True
+
+                # Directly update latest transcript for LLM processing if enabled
+                # This makes LLM processing independent of is_new_transcript() checks
+                if self.use_llm and len(transcription.split()) >= self.llm_min_words:
+                    # Pass the raw transcription directly to LLM processing
+                    self.latest_transcript = transcription
+
                 logger.debug(f"Transcription: {transcription}")
         except asyncio.CancelledError:
             # Task was cancelled, exit gracefully
@@ -382,10 +389,6 @@ class SpeechToTextStreamer:
             self.new_transcript_available = False
             self.last_check_time = current_time
             self.last_transcript_words = current_word_count
-
-            # Update latest transcript for LLM processing if enabled
-            if self.use_llm:
-                self.latest_transcript = self.get_transcript(min_words=self.llm_min_words, max_words=self.llm_max_words)
 
             return True
 
@@ -459,6 +462,8 @@ class SpeechToTextStreamer:
                 # Clear to avoid duplicate processing
                 self.latest_transcript = ""
 
+                logger.info(f"LLM processing transcript: {transcript}")
+
                 # Process with LLM
                 response = await self.process_with_llm(transcript)
                 if response:
@@ -466,6 +471,8 @@ class SpeechToTextStreamer:
                     self.new_llm_response = True
                     logger.info(f"LLM processed: {transcript}")
                     logger.info(f"LLM response: {response}")
+                else:
+                    logger.warning(f"LLM returned no response for: {transcript}")
 
             await asyncio.sleep(0.1)  # Short sleep to prevent CPU hogging
 
@@ -538,6 +545,7 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, default="gpt-4o-2024-08-06", help="LLM model to use for processing transcripts")
     parser.add_argument("--max-tokens", type=int, default=500, help="Maximum tokens in LLM response")
     parser.add_argument("--no-llm", action="store_true", help="Disable LLM processing")
+    parser.add_argument("--no-transcript", action="store_true", help="Disable transcript display (LLM still works)")
     parser.add_argument("--min-time-passed", type=float, default=1.0, help="Minimum time (in seconds) between transcript checks")
 
     args = parser.parse_args()
@@ -584,12 +592,17 @@ The next message I send you will be an Input, and you directly continue after 'O
         min_time_passed=args.min_time_passed,
     )
 
+    # streamer = SpeechToTextStreamer(
+    #     use_llm=True,
+    # )
+
     try:
         # Main thread runs a synchronous heartbeat loop
         while True:
-            if streamer.is_new_transcript(min_extra_words=1):
-                transcript = streamer.get_transcript(min_words=1, max_words=20)
-                print(f"Latest transcript: {transcript}")
+            # Check for new transcript unless disabled
+            # if not args.no_transcript and streamer.is_new_transcript(min_extra_words=1):
+            #     transcript = streamer.get_transcript(min_words=1, max_words=20)
+            #     print(f"Latest transcript: {transcript}")
 
             # Check for new LLM responses
             if streamer.is_new_llm_response():
