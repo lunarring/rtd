@@ -10,6 +10,7 @@ from PIL import Image
 from .infrared.colorize_infrared import ImageColorizationPipelineHF
 from motion.motion_tracking import MotionTracker
 
+
 def img2tensor(tensor):
     """
     Converts a tensor to a numpy array.
@@ -138,14 +139,7 @@ def torch_rotate(x, a):
 
 
 class InputImageProcessor:
-    def __init__(
-        self,
-        do_human_seg=True,
-        do_blur=False,
-        blur_kernel=3,
-        do_infrared_colorize=False,
-        device="cuda"
-    ):
+    def __init__(self, do_human_seg=True, do_blur=False, blur_kernel=3, do_infrared_colorize=False, device="cuda"):
         self.device = device
         self.brightness = 1.0
         self.saturization = 1.0
@@ -158,8 +152,14 @@ class InputImageProcessor:
         self.infrared_colorizer = ImageColorizationPipelineHF()
 
         # initialize motion tracking
-        self.motion_tracker = MotionTracker()
-        
+
+        try:
+            from motion.motion_tracking import MotionTracker
+
+            self.motion_tracker = MotionTracker()
+        except Exception as e:
+            print(f"MotionTracker not found! {e}. Motion tracking masking will not be applied.")
+
         # human body segmentation
         self.human_seg = HumanSeg(
             resizing_factor=self.resizing_factor_humanseg, device=device, apply_smoothing=True, gaussian_kernel_size=9, gaussian_sigma=3
@@ -216,7 +216,7 @@ class InputImageProcessor:
 
     def set_opt_flow_threshold(self, threshold=1):
         self.opt_flow_threshold = threshold
-        
+
     def set_motion_tracking_masking(self, do_motion_tracking_masking=True):
         self.do_motion_tracking_masking = do_motion_tracking_masking
 

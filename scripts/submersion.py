@@ -150,7 +150,11 @@ if __name__ == "__main__":
     init_prompt = "Dancing people full of glowing neon nerve fibers and filamenets"
     # init_prompt = "glowing digital fire full of glitches and neon matrix powerful fire glow and plasma"
     # init_prompt = "glowing digital fire full of glitches and neon matrix powerful fire glow and plasma"
+<<<<<<< HEAD
     init_prompt = "The Metamorphosis of Time: Deep below, volcano’s asleep, pulsating rhythmically on the still mirror of the lake"
+=======
+    init_prompt = 'The Metamorphosis of Time: Deep below, volcano’s asleep, pulsating rhythmically on the still mirror of the lake'
+>>>>>>> b509666c012469a61296c5baa246db077ea3b4bb
 
     meta_input = lt.MetaInput()
     de_img = DiffusionEngine(
@@ -330,6 +334,7 @@ if __name__ == "__main__":
 
         #  postproc control
         postproc_mod_button1 = meta_input.get(akai_midimix="G4", button_mode="toggle", val_default=True)
+<<<<<<< HEAD
 
         flow_gain = meta_input.get(akai_lpd8="D0", akai_midimix="D0", val_min=0, val_max=1, val_default=0.3)
         reverb_gain = meta_input.get(akai_lpd8="D1", akai_midimix="D1", val_min=0, val_max=1, val_default=0.3)
@@ -337,6 +342,13 @@ if __name__ == "__main__":
         # postproc_func_coef1 = 0.5
         # postproc_func_coef2 = 0.5
 
+=======
+        flow_gain = meta_input.get(akai_lpd8="D0", akai_midimix="D0", val_min=0, val_max=1, val_default=0.3)
+        reverb_gain = meta_input.get(akai_lpd8="D1", akai_midimix="D1", val_min=0, val_max=1, val_default=0.3)
+        background_image_gain = meta_input.get(akai_midimix="D2", val_min=0, val_max=1, val_default=0.6)
+        # postproc_func_coef1 = 0.5  
+        #postproc_func_coef2 = 0.5  
+>>>>>>> b509666c012469a61296c5baa246db077ea3b4bb
         # postproc_mod_button1 = True
         #  oscillator-based control
         if do_param_oscillators:
