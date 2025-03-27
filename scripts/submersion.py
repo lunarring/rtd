@@ -30,7 +30,8 @@
 from rtd.sdxl_turbo.diffusion_engine import DiffusionEngine
 from rtd.sdxl_turbo.embeddings_mixer import EmbeddingsMixer
 import lunar_tools as lt
-#from rtd.dynamic_processor.processor_dynamic_module import DynamicProcessor
+
+# from rtd.dynamic_processor.processor_dynamic_module import DynamicProcessor
 from rtd.utils.input_image import InputImageProcessor, AcidProcessor
 from rtd.utils.optical_flow import OpticalFlowEstimator
 from rtd.utils.posteffect import Posteffect
@@ -52,6 +53,7 @@ import socket
 
 from rtd.utils.compression_helpers import send_compressed
 
+
 class TouchDesignerSender:
     def __init__(self, host="localhost", port=9998):
         self.host = host
@@ -61,7 +63,7 @@ class TouchDesignerSender:
         self.attempt_reconnect = True
         self.last_reconnect_time = 0
         self.reconnect_interval = 5  # seconds between reconnection attempts
-        
+
     def connect(self):
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -76,17 +78,17 @@ class TouchDesignerSender:
             print(f"Failed to connect to TouchDesigner: {e}")
             self.connected = False
             return False
-    
+
     def send_image(self, image):
         if not self.connected:
             current_time = time.time()
             if self.attempt_reconnect and (current_time - self.last_reconnect_time > self.reconnect_interval):
                 self.last_reconnect_time = current_time
                 self.connect()
-            
+
             if not self.connected:
                 return False
-                
+
         try:
             send_compressed(self.socket, image, quality=90)
             return True
@@ -94,6 +96,7 @@ class TouchDesignerSender:
             print(f"Error sending to TouchDesigner: {e}")
             self.connected = False
             return False
+
 
 def get_sample_shape_unet(coord, noise_resolution_h, noise_resolution_w):
     channels = 640 if coord[0] == "e" else 1280 if coord[0] == "b" else 640
@@ -129,7 +132,6 @@ if __name__ == "__main__":
     video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
     print(video_file_path_input)
     video_file_path_output = "materials/videos/long_cut_diffusion2.mp4"
-
 
     device = "cuda:0"
     img_diffusion = None
@@ -172,15 +174,15 @@ if __name__ == "__main__":
     )
     cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=0)
     cam.do_mirror = True
-    
+
     # Initialize movie reader if loading from file
     if do_load_cam_input_from_file:
         movie_reader = lt.MovieReader(video_file_path_input)
-    
+
     # Initialize movie saver if saving output to file
     if do_save_diffusion_output_to_file:
         movie_saver = lt.MovieSaver(video_file_path_output, fps=12)
-    
+
     input_image_processor = InputImageProcessor(device=device)
     input_image_processor.set_flip(do_flip=True, flip_axis=1)
 
@@ -205,8 +207,7 @@ if __name__ == "__main__":
     speech_detector = lt.Speech2Text()
     prompt_provider_mic = PromptProviderMicrophone(init_prompt="A beautiful landscape")
     prompt_provider_txt_file = PromptProviderTxtFile(
-        get_repo_path("materials/prompts/gosia_poetry.txt", __file__),
-        mode="sequential"  # Can be "random" or "sequential"
+        get_repo_path("materials/prompts/gosia_poetry.txt", __file__), mode="sequential"  # Can be "random" or "sequential"
     )
     opt_flow_estimator = OpticalFlowEstimator(use_ema=False)
 
@@ -230,25 +231,25 @@ if __name__ == "__main__":
         t_processing_start = time.time()
         # bools
         new_prompt_mic_unmuter = meta_input.get(akai_lpd8="A1", akai_midimix="A3", button_mode="held_down")
-  
+
         hue_rotation = meta_input.get(akai_midimix="A1", val_min=0, val_max=180, val_default=0)
         prompt_transition_time = meta_input.get(akai_lpd8="G1", akai_midimix="A2", val_min=1, val_max=50, val_default=8.0)
         do_cycle_prompt_from_file = meta_input.get(akai_lpd8="C0", akai_midimix="A4", button_mode="pressed_once")
 
-        dyn_prompt_mic_unmuter = False # meta_input.get(akai_lpd8="A0", akai_midimix="B3", button_mode="held_down")
-        do_dynamic_processor = False # meta_input.get(akai_lpd8="B0", akai_midimix="B4", button_mode="toggle", val_default=False)
-        dyn_prompt_restore_backup = False # meta_input.get(akai_midimix="F3", button_mode="released_once")
-        dyn_prompt_del_current = False # meta_input.get(akai_midimix="F4", button_mode="released_once")
+        dyn_prompt_mic_unmuter = False  # meta_input.get(akai_lpd8="A0", akai_midimix="B3", button_mode="held_down")
+        do_dynamic_processor = False  # meta_input.get(akai_lpd8="B0", akai_midimix="B4", button_mode="toggle", val_default=False)
+        dyn_prompt_restore_backup = False  # meta_input.get(akai_midimix="F3", button_mode="released_once")
+        dyn_prompt_del_current = False  # meta_input.get(akai_midimix="F4", button_mode="released_once")
 
         do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="E3", button_mode="toggle", val_default=False)
-        do_acid_wobblers = False #meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
-        do_infrared_colorize = False #meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
+        do_acid_wobblers = False  # meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
+        do_infrared_colorize = False  # meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
-        do_audio_modulation = False #meta_input.get(akai_midimix="D4", button_mode="toggle", val_default=False)
-        do_param_oscillators = False #meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
+        do_audio_modulation = False  # meta_input.get(akai_midimix="D4", button_mode="toggle", val_default=False)
+        do_param_oscillators = False  # meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
         do_opt_flow_seg = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=False)
 
-        #do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=True)
+        # do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=True)
         do_postproc = meta_input.get(akai_midimix="E4", button_mode="toggle", val_default=False)
 
         do_optical_flow = do_postproc or do_opt_flow_seg
@@ -259,46 +260,42 @@ if __name__ == "__main__":
         acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.0)
         opt_flow_threshold = meta_input.get(akai_lpd8="E2", akai_midimix="E2", val_min=0, val_max=2, val_default=1)
         coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=0.3, val_default=0.00)
-        #zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H2", val_min=0.5, val_max=1.5, val_default=1.0)
+        # zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H2", val_min=0.5, val_max=1.5, val_default=1.0)
         zoom_out_factor = meta_input.get(akai_lpd8="F1", akai_midimix="G5", val_min=0, val_max=0.3, val_default=0)
         zoom_in_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H5", val_min=0, val_max=0.3, val_default=0)
         if zoom_in_factor * zoom_out_factor == 0:
             zoom_factor = 1 - zoom_in_factor + zoom_out_factor
         else:
-            zoom_factor = 1 + oscillator.get("zoom_factor", 1./(0.2*zoom_in_factor), zoom_out_factor, -zoom_out_factor, "continuous")
+            zoom_factor = 1 + oscillator.get("zoom_factor", 1.0 / (0.2 * zoom_in_factor), zoom_out_factor, -zoom_out_factor, "continuous")
 
-        
         # X shift with oscillation when both directions are active
         x_shift_left = meta_input.get(akai_midimix="G1", val_min=0, val_max=50, val_default=0)
         x_shift_right = meta_input.get(akai_midimix="H1", val_min=0, val_max=50, val_default=0)
         if x_shift_left * x_shift_right == 0:
             x_shift = int(x_shift_right - x_shift_left)
         else:
-            x_shift = int(oscillator.get("x_shift", 1./(0.5*x_shift_right), x_shift_left, -x_shift_right, "continuous"))
+            x_shift = int(oscillator.get("x_shift", 1.0 / (0.5 * x_shift_right), x_shift_left, -x_shift_right, "continuous"))
 
-        
         # Y shift with oscillation when both directions are active
         y_shift_up = meta_input.get(akai_midimix="G0", val_min=0, val_max=50, val_default=0)
         y_shift_down = meta_input.get(akai_midimix="H0", val_min=0, val_max=50, val_default=0)
         if y_shift_up * y_shift_down == 0:
             y_shift = int(y_shift_down - y_shift_up)
         else:
-            y_shift = int(oscillator.get("y_shift", 1./(0.5*y_shift_down), y_shift_up, -y_shift_down, "continuous"))
+            y_shift = int(oscillator.get("y_shift", 1.0 / (0.5 * y_shift_down), y_shift_up, -y_shift_down, "continuous"))
 
-        
         # Rotation with oscillation when both directions are active
         rotation_left = meta_input.get(akai_midimix="G2", val_min=0, val_max=30, val_default=0)
         rotation_right = meta_input.get(akai_midimix="H2", val_min=0, val_max=30, val_default=0)
         if rotation_left * rotation_right == 0:
             rotation_angle = rotation_right - rotation_left
         else:
-            rotation_angle = oscillator.get("rotation_angle", 1./(0.5*rotation_right), rotation_left, -rotation_right, "continuous")
+            rotation_angle = oscillator.get("rotation_angle", 1.0 / (0.5 * rotation_right), rotation_left, -rotation_right, "continuous")
 
-        
         color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="B0", val_min=0, val_max=1, val_default=0.5)
         brightness = meta_input.get(akai_midimix="A0", val_min=0.0, val_max=2, val_default=1.0)
         # Add latent acid strength parameter
-        #latent_acid_strength = meta_input.get(akai_midimix="D1", val_min=0, val_max=1.0, val_default=0.0)
+        # latent_acid_strength = meta_input.get(akai_midimix="D1", val_min=0, val_max=1.0, val_default=0.0)
         latent_acid_strength = 0.0
 
         # Modulation controls
@@ -326,10 +323,10 @@ if __name__ == "__main__":
         # dynamic_func_coef3 = meta_input.get(akai_midimix="F2", val_min=0, val_max=1, val_default=0.5)
 
         #  postproc control
-        postproc_func_coef1 = 0.5 # meta_input.get(akai_lpd8="H0", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
-        postproc_func_coef2 = 0.5 # meta_input.get(akai_lpd8="H1", akai_midimix="G2", val_min=0, val_max=1, val_default=0.5)
+        postproc_func_coef1 = 0.5  # meta_input.get(akai_lpd8="H0", akai_midimix="G1", val_min=0, val_max=1, val_default=0.5)
+        postproc_func_coef2 = 0.5  # meta_input.get(akai_lpd8="H1", akai_midimix="G2", val_min=0, val_max=1, val_default=0.5)
         postproc_mod_button1 = meta_input.get(akai_midimix="G4", button_mode="toggle", val_default=True)
-        #postproc_mod_button1 = True
+        # postproc_mod_button1 = True
         #  oscillator-based control
         if do_param_oscillators:
             do_cycle_prompt_from_file = oscillator.get("prompt_cycle", 60, 0, 1, "trigger")
@@ -405,7 +402,7 @@ if __name__ == "__main__":
         else:
             # Get frame from video file instead of webcam
             img_cam = movie_reader.get_next_frame()
-            
+
             # If we reached the end of the video (get_next_frame returns empty/black frame), reset the video reader
             if img_cam is None or (isinstance(img_cam, np.ndarray) and (img_cam.size == 0 or np.max(img_cam) == 0)):
                 print("End of video reached, looping back to the beginning")
@@ -413,11 +410,11 @@ if __name__ == "__main__":
                 movie_reader = lt.MovieReader(video_file_path_input)
                 # Get the first frame
                 img_cam = movie_reader.get_next_frame()
-            
+
             # Convert BGR to RGB for processing
             if img_cam is not None and img_cam.size > 0:
-                img_cam = img_cam[:,:,::-1].copy()
-                    
+                img_cam = img_cam[:, :, ::-1].copy()
+
         img_cam_last = img_cam.copy()
 
         fps_tracker.start_segment("OptFlow")
@@ -437,8 +434,8 @@ if __name__ == "__main__":
         input_image_processor.set_opt_flow_threshold(opt_flow_threshold)
         img_proc, human_seg_mask = input_image_processor.process(img_cam, opt_flow)
 
-        if not do_human_seg and not do_opt_flow_seg:
-            human_seg_mask = np.ones_like(img_proc).astype(np.float32)  # / 255
+        # if not do_human_seg and not do_opt_flow_seg: VERY BAD, BREAKS COLOR SCALING!!!
+        #     human_seg_mask = np.ones_like(img_proc).astype(np.float32)  # / 255
 
         fps_tracker.start_segment("Acid")
         # Acid
@@ -465,6 +462,10 @@ if __name__ == "__main__":
 
         # apply posteffect
         if do_postproc:
+            if human_seg_mask is None:
+                hsm = np.ones_like(img_proc).astype(np.float32) / 255
+            else:
+                hsm = human_seg_mask.astype(np.float32) / 255
             if do_enable_dynamic_processor:
                 new_dynamic_prompt_available = speech_detector.handle_unmute_button(dyn_prompt_mic_unmuter)
 
@@ -479,7 +480,7 @@ if __name__ == "__main__":
                     dynamic_processor.delete_current_fn_func()
                 img_proc = dynamic_processor.process(
                     np.flip(img_diffusion.astype(np.float32), axis=1).copy(),
-                    human_seg_mask.astype(np.float32) / 255,
+                    hsm,
                     opt_flow,
                     postproc_func_coef1,
                 )
@@ -491,7 +492,7 @@ if __name__ == "__main__":
                 if opt_flow is not None:
                     output_to_render, update_img = posteffect_processor.process(
                         img_diffusion,
-                        human_seg_mask.astype(np.float32) / 255,
+                        hsm,
                         opt_flow,
                         postproc_func_coef1,
                         postproc_func_coef2,
@@ -517,15 +518,13 @@ if __name__ == "__main__":
 
         if do_send_to_touchdesigner:
             td_sender.send_image(output_to_render)
-            
+
         if do_save_diffusion_output_to_file:
             movie_saver.write_frame(output_to_render)
-            if frame_counter >= 512*8:
+            if frame_counter >= 512 * 8:
                 movie_saver.finalize()
                 print(f"Movie saved to {video_file_path_output} after {frame_counter+1} frames")
                 do_save_diffusion_output_to_file = False
-
-        
 
         # Update and display FPS (this will also handle the last segment timing)
         fps_tracker.print_fps()
