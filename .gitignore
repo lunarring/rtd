@@ -1,4 +1,6 @@
 # Byte-compiled / optimized / DLL files
+*.txt
+*.mp4
 src/rtd/dynamic_processor/dynamic_module.py
 */logs/*
 backup_dynamic*

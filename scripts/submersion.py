@@ -173,7 +173,7 @@ if __name__ == "__main__":
         do_fullscreen=do_fullscreen,
     )
     cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=0)
-    cam.do_mirror = True
+    cam.do_mirror = False
 
     # Initialize movie reader if loading from file
     if do_load_cam_input_from_file:
@@ -232,7 +232,7 @@ if __name__ == "__main__":
         # bools
         new_prompt_mic_unmuter = meta_input.get(akai_lpd8="A1", akai_midimix="A3", button_mode="held_down")
 
-        hue_rotation = meta_input.get(akai_midimix="A1", val_min=0, val_max=180, val_default=0)
+        hue_rotation_angle = meta_input.get(akai_midimix="A1", val_min=0, val_max=180, val_default=0)
         prompt_transition_time = meta_input.get(akai_lpd8="G1", akai_midimix="A2", val_min=1, val_max=50, val_default=8.0)
         do_cycle_prompt_from_file = meta_input.get(akai_lpd8="C0", akai_midimix="A4", button_mode="pressed_once")
 
@@ -263,6 +263,10 @@ if __name__ == "__main__":
         # zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H2", val_min=0.5, val_max=1.5, val_default=1.0)
         zoom_out_factor = meta_input.get(akai_lpd8="F1", akai_midimix="G5", val_min=0, val_max=0.05, val_default=0)
         zoom_in_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H5", val_min=0, val_max=0.05, val_default=0)
+        acid_hue_rot = meta_input.get(akai_midimix="F0", val_min=0, val_max=15, val_default=0)
+        acid_saturation = meta_input.get(akai_midimix="F1", val_min=-15, val_max=15, val_default=0)
+        acid_lightness = meta_input.get(akai_midimix="F2", val_min=-15, val_max=15, val_default=0)
+
         if zoom_in_factor * zoom_out_factor == 0:
             zoom_factor = 1 - zoom_in_factor + zoom_out_factor
         else:
@@ -327,8 +331,8 @@ if __name__ == "__main__":
         flow_gain = meta_input.get(akai_lpd8="D0", akai_midimix="D0", val_min=0, val_max=1, val_default=0.0)
         reverb_gain = meta_input.get(akai_lpd8="D1", akai_midimix="D1", val_min=0, val_max=1, val_default=0.0)
         background_image_gain = meta_input.get(akai_midimix="D2", val_min=0, val_max=1, val_default=0.0)
-        # postproc_func_coef1 = 0.5  
-        #postproc_func_coef2 = 0.5  
+        # postproc_func_coef1 = 0.5
+        # postproc_func_coef2 = 0.5
         # postproc_mod_button1 = True
         #  oscillator-based control
         if do_param_oscillators:
@@ -433,6 +437,7 @@ if __name__ == "__main__":
         input_image_processor.set_resizing_factor_humanseg(0.4)
         input_image_processor.set_blur(do_blur)
         input_image_processor.set_brightness(brightness)
+        input_image_processor.set_hue_rotation(hue_rotation_angle)
         input_image_processor.set_infrared_colorize(do_infrared_colorize)
         input_image_processor.set_opt_flow_threshold(opt_flow_threshold)
         img_proc, human_seg_mask = input_image_processor.process(img_cam, opt_flow)
@@ -452,6 +457,9 @@ if __name__ == "__main__":
         acid_processor.set_do_acid_wobblers(do_acid_wobblers)
         acid_processor.set_color_matching(color_matching)
         acid_processor.set_rotation_angle(rotation_angle)
+        acid_processor.set_acid_hue_rotation_angle(acid_hue_rot)
+        acid_processor.set_acid_saturation_adjustment(acid_saturation)
+        acid_processor.set_acid_lightness_adjustment(acid_lightness)
         img_acid = acid_processor.process(img_proc, human_seg_mask)
 
         # Start timing diffusion

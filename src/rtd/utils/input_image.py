@@ -312,7 +312,7 @@ class InputImageProcessor:
 
             # Rotate the hue
             # Hue is represented in OpenCV as a value from 0 to 180 instead of 0 to 360...
-            img_hsv[:, :, 0] = (img_hsv[:, :, 0] + (self.hue_rotation_angle / 2)) % 180
+            img_hsv[:, :, 0] = (img_hsv[:, :, 0] + (self.hue_rotation_angle)) % 180
 
             # clip the values to stay in valid range
             img_hsv[:, :, 1] = np.clip(img_hsv[:, :, 1], 0, 255)
@@ -339,6 +339,9 @@ class AcidProcessor:
         self.y_shift = 0
         self.zoom_factor = 1
         self.rotation_angle = 0
+        self.acid_hue_rotation_angle = 0
+        self.acid_saturation_adjustment = 0
+        self.acid_lightness_adjustment = 0
         self.do_acid_tracers = False
 
         self.do_acid_wobblers = False
@@ -371,6 +374,15 @@ class AcidProcessor:
 
     def set_rotation_angle(self, rotation_angle):
         self.rotation_angle = rotation_angle
+
+    def set_acid_hue_rotation_angle(self, hue_rotation_angle):
+        self.acid_hue_rotation_angle = hue_rotation_angle
+
+    def set_acid_saturation_adjustment(self, saturation_adjustment):
+        self.acid_saturation_adjustment = saturation_adjustment
+
+    def set_acid_lightness_adjustment(self, lightness_adjustment):
+        self.acid_lightness_adjustment = lightness_adjustment
 
     def set_acid_tracers(self, do_acid_tracers):
         self.do_acid_tracers = do_acid_tracers
@@ -479,6 +491,23 @@ class AcidProcessor:
         last_diffusion_image_torch = self.last_diffusion_image_torch
         width_diffusion = self.width_diffusion
         height_diffusion = self.height_diffusion
+
+        # Apply hue rotation to the last diffusion image if needed
+        if abs(self.acid_hue_rotation_angle) > 0 or abs(self.acid_saturation_adjustment) > 0 or abs(self.acid_lightness_adjustment) > 0:
+            # Convert to numpy to use OpenCV for hue rotation
+            last_diffusion_image_np = last_diffusion_image_torch.cpu().numpy().astype(np.uint8)
+            # Convert to HSV
+            last_diffusion_image_hsv = cv2.cvtColor(last_diffusion_image_np, cv2.COLOR_BGR2HSV).astype(float)
+            # Apply hue rotation (OpenCV uses 0-180 range for hue)
+            last_diffusion_image_hsv[:, :, 0] = (last_diffusion_image_hsv[:, :, 0] + self.acid_hue_rotation_angle) % 180
+            # Apply saturation adjustment (ensuring we don't overflow)
+            last_diffusion_image_hsv[:, :, 1] = np.clip(last_diffusion_image_hsv[:, :, 1] + self.acid_saturation_adjustment, 0, 255)
+            # Apply lightness adjustment (ensuring we don't overflow)
+            last_diffusion_image_hsv[:, :, 2] = np.clip(last_diffusion_image_hsv[:, :, 2] + self.acid_lightness_adjustment, 0, 255)
+            # Convert back to BGR
+            last_diffusion_image_np = cv2.cvtColor(last_diffusion_image_hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+            # Back to torch tensor
+            last_diffusion_image_torch = torch.from_numpy(last_diffusion_image_np).to(self.device).float()
 
         # acid transform
         # wobblers
