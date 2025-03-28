@@ -169,10 +169,10 @@ if __name__ == "__main__":
     do_realtime_transcription = False
     do_compile = True
     do_diffusion = True
-    do_fullscreen = True
+    do_fullscreen = False
     do_enable_dynamic_processor = False
     do_send_to_touchdesigner = False
-    do_load_cam_input_from_file = True
+    do_load_cam_input_from_file = False
     do_save_diffusion_output_to_file = False
     
     video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
@@ -263,7 +263,7 @@ if __name__ == "__main__":
         prompt_provider_mic = PromptProviderMicrophone(init_prompt="A beautiful landscape")
 
     prompt_provider_txt_file = PromptProviderTxtFile(
-        get_repo_path("materials/prompts/gosia_poetry.txt", __file__), mode="sequential"  # Can be "random" or "sequential"
+        get_repo_path("materials/prompts/gosia_cooked.txt", __file__), mode="sequential"  # Can be "random" or "sequential"
     )
     opt_flow_estimator = OpticalFlowEstimator(use_ema=False)
 
@@ -289,7 +289,7 @@ if __name__ == "__main__":
         new_prompt_mic_unmuter = meta_input.get(akai_lpd8="F1", akai_midimix="F3", button_mode="held_down")
 
         hue_rotation_angle = int(meta_input.get(akai_midimix="A0", val_min=0, val_max=360, val_default=0))
-        prompt_transition_time = meta_input.get(akai_lpd8="G1", akai_midimix="F0", val_min=1, val_max=50, val_default=8.0)
+        prompt_transition_time = meta_input.get(akai_lpd8="G1", akai_midimix="F0", val_min=1, val_max=20, val_default=8.0)
         do_cycle_prompt_from_file = meta_input.get(akai_lpd8="C0", akai_midimix="F4", button_mode="pressed_once")
 
         dyn_prompt_mic_unmuter = False  # meta_input.get(akai_lpd8="A0", akai_midimix="B3", button_mode="held_down")
@@ -297,8 +297,8 @@ if __name__ == "__main__":
         dyn_prompt_restore_backup = False  # meta_input.get(akai_midimix="F3", button_mode="released_once")
         dyn_prompt_del_current = False  # meta_input.get(akai_midimix="F4", button_mode="released_once")
 
-        do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="A3", button_mode="toggle", val_default=False)
-        do_motion_tracking_masking = meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
+        do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="A3", button_mode="toggle", val_default=True)
+        do_motion_tracking_masking = meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=True)
         do_acid_wobblers = False  # meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
         do_infrared_colorize = False  # meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
@@ -313,9 +313,9 @@ if __name__ == "__main__":
         do_optical_flow = do_postproc or do_opt_flow_seg
         # floats
         # nmb_inference_steps = meta_input.get(akai_midimix="B0", val_min=2, val_max=10.0, val_default=2.0)
-        nmb_inference_steps = 4
+        nmb_inference_steps = 3
         acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.4)
-        acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.4)
+        acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.0)
         # opt_flow_threshold = meta_input.get(akai_lpd8="E2", akai_midimix="E2", val_min=0, val_max=2, val_default=1)
         opt_flow_threshold = 1
         coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=0.3, val_default=0.08)
@@ -358,7 +358,7 @@ if __name__ == "__main__":
             rotation_angle = oscillator.get("rotation_angle", 1.0 / (0.5 * rotation_right), rotation_left, -rotation_right, "continuous")
 
         color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="A5", val_min=0, val_max=1, val_default=0.5)
-        brightness = meta_input.get(akai_midimix="A2", val_min=0.0, val_max=2, val_default=1.0)
+        brightness = meta_input.get(akai_midimix="A2", val_min=0.0, val_max=2, val_default=2.0)
         # Add latent acid strength parameter
         # latent_acid_strength = meta_input.get(akai_midimix="D1", val_min=0, val_max=1.0, val_default=0.0)
         latent_acid_strength = 0.0
@@ -494,10 +494,15 @@ if __name__ == "__main__":
         img_cam_last = img_cam.copy()
 
         fps_tracker.start_segment("OptFlow")
-        if do_optical_flow:
-            opt_flow = opt_flow_estimator.get_optflow(img_cam.copy(), low_pass_kernel_size=55, window_length=55)
-        else:
-            opt_flow = None
+
+        try:
+            if do_optical_flow:
+                opt_flow = opt_flow_estimator.get_optflow(img_cam.copy(), low_pass_kernel_size=55, window_length=55)
+            else:
+                opt_flow = None
+        except:
+            print("Error getting optical flow")
+            opt_flow = np.zeros((img_cam.shape[0], img_cam.shape[1], 2), dtype=np.float32)
 
         fps_tracker.start_segment("InImg")
         # Start timing image processing
