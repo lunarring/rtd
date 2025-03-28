@@ -152,6 +152,7 @@ if __name__ == "__main__":
     touchdesigner_host = "192.168.100.101"  # Change to your TouchDesigner machine's IP
     touchdesigner_port = 9998
 
+    do_realtime_transcription = False
     do_compile = True
     do_diffusion = True
     do_fullscreen = True
@@ -203,7 +204,7 @@ if __name__ == "__main__":
         backend="opencv",
         do_fullscreen=do_fullscreen,
     )
-    cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=2)
+    cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=0)
     cam.do_mirror = False
 
     # Initialize movie reader if loading from file
@@ -305,7 +306,7 @@ if __name__ == "__main__":
         # zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H2", val_min=0.5, val_max=1.5, val_default=1.0)
         zoom_out_factor = meta_input.get(akai_lpd8="F1", akai_midimix="G5", val_min=0, val_max=0.05, val_default=0)
         zoom_in_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H5", val_min=0, val_max=0.05, val_default=0)
-        acid_hue_rot = meta_input.get(akai_midimix="B0", val_min=0, val_max=90, val_default=0)
+        acid_hue_rot = meta_input.get(akai_midimix="B0", val_min=0, val_max=30, val_default=0)
         acid_saturation = meta_input.get(akai_midimix="B1", val_min=-15, val_max=15, val_default=0)
         acid_lightness = meta_input.get(akai_midimix="B2", val_min=-15, val_max=15, val_default=0)
         saturation = meta_input.get(akai_midimix="A1", val_min=0.0, val_max=2.0, val_default=1.0)  # Add saturation control

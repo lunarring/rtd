@@ -12,7 +12,10 @@ import argparse
 from signal import signal, SIGINT
 
 # Import from RTD modules
-from rtd.voice.speech_to_text_streaming import SpeechToTextStreamer
+try:
+    from rtd.voice.speech_to_text_streaming import SpeechToTextStreamer
+except Exception as e:
+    print(f"SpeechToTextStreamer not found! {e}. Speech-to-text will not be available.")
 
 
 # Configure logging
