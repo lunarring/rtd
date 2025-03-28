@@ -233,7 +233,7 @@ if __name__ == "__main__":
         # bools
         new_prompt_mic_unmuter = meta_input.get(akai_lpd8="F1", akai_midimix="F3", button_mode="held_down")
 
-        hue_rotation_angle = meta_input.get(akai_midimix="A0", val_min=0, val_max=180, val_default=0)
+        hue_rotation_angle = int(meta_input.get(akai_midimix="A0", val_min=0, val_max=360, val_default=0))
         prompt_transition_time = meta_input.get(akai_lpd8="G1", akai_midimix="F0", val_min=1, val_max=50, val_default=8.0)
         do_cycle_prompt_from_file = meta_input.get(akai_lpd8="C0", akai_midimix="F4", button_mode="pressed_once")
 
@@ -266,7 +266,7 @@ if __name__ == "__main__":
         # zoom_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H2", val_min=0.5, val_max=1.5, val_default=1.0)
         zoom_out_factor = meta_input.get(akai_lpd8="F1", akai_midimix="G5", val_min=0, val_max=0.05, val_default=0)
         zoom_in_factor = meta_input.get(akai_lpd8="F1", akai_midimix="H5", val_min=0, val_max=0.05, val_default=0)
-        acid_hue_rot = meta_input.get(akai_midimix="B0", val_min=0, val_max=30, val_default=0)
+        acid_hue_rot = meta_input.get(akai_midimix="B0", val_min=0, val_max=90, val_default=0)
         acid_saturation = meta_input.get(akai_midimix="B1", val_min=-15, val_max=15, val_default=0)
         acid_lightness = meta_input.get(akai_midimix="B2", val_min=-15, val_max=15, val_default=0)
         saturation = meta_input.get(akai_midimix="A1", val_min=0.0, val_max=2.0, val_default=1.0)  # Add saturation control

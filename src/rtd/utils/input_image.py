@@ -318,11 +318,11 @@ class InputImageProcessor:
         # HSV color space adjustment
         if self.saturation != 1.0 or self.hue_rotation_angle != 0.0 or self.brightness != 1.0:
             # Convert to HSV
-            img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
+            img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
             
             # Apply hue rotation
             if self.hue_rotation_angle != 0.0:
-                img_hsv[:, :, 0] = (img_hsv[:, :, 0] + self.hue_rotation_angle) % 180
+                img_hsv[:, :, 0] = (img_hsv[:, :, 0] + self.hue_rotation_angle) % 360
             
             # Apply saturation
             if self.saturation != 1.0:
@@ -333,7 +333,7 @@ class InputImageProcessor:
                 img_hsv[:, :, 2] = np.clip(img_hsv[:, :, 2] * self.brightness, 0, 255)
             
             # Convert back to BGR
-            img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2RGB)
+            img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR).astype(np.uint8)
         else:
             img = img.astype(np.uint8)
 
@@ -517,7 +517,7 @@ class AcidProcessor:
             # Convert to HSV
             last_diffusion_image_hsv = cv2.cvtColor(last_diffusion_image_np, cv2.COLOR_BGR2HSV).astype(float)
             # Apply hue rotation (OpenCV uses 0-180 range for hue)
-            last_diffusion_image_hsv[:, :, 0] = (last_diffusion_image_hsv[:, :, 0] + self.acid_hue_rotation_angle) % 180
+            last_diffusion_image_hsv[:, :, 0] = (last_diffusion_image_hsv[:, :, 0] + self.acid_hue_rotation_angle) % 360
             # Apply saturation adjustment (ensuring we don't overflow)
             last_diffusion_image_hsv[:, :, 1] = np.clip(last_diffusion_image_hsv[:, :, 1] + self.acid_saturation_adjustment, 0, 255)
             # Apply lightness adjustment (ensuring we don't overflow)
