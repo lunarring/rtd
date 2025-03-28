@@ -142,10 +142,18 @@ def get_sample_shape_unet(coord, noise_resolution_h, noise_resolution_w):
 
 
 if __name__ == "__main__":
+
+    do_main_projector = True
+
     height_diffusion = int((384 + 96) * 1.5)  # 12 * (384 + 96) // 8
     width_diffusion = int((512 + 128) * 1.5)  # 12 * (512 + 128) // 8
-    height_render = 1080
-    width_render = 1920
+    if do_main_projector:
+        height_render = 1080
+        width_render = 1920-512+128
+    else:
+        height_render = 1080
+        width_render = 1920
+
     n_frame_interpolations: int = 5
     shape_hw_cam = (576, 1024)
 
@@ -158,7 +166,7 @@ if __name__ == "__main__":
     do_fullscreen = True
     do_enable_dynamic_processor = False
     do_send_to_touchdesigner = False
-    do_load_cam_input_from_file = True
+    do_load_cam_input_from_file = False
     do_save_diffusion_output_to_file = False
     video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
     print(video_file_path_input)
@@ -216,7 +224,7 @@ if __name__ == "__main__":
         movie_saver = lt.MovieSaver(video_file_path_output, fps=12)
 
     input_image_processor = InputImageProcessor(device=device)
-    input_image_processor.set_flip(do_flip=True, flip_axis=1)
+    input_image_processor.set_flip(do_flip=False, flip_axis=1)
 
     if do_send_to_touchdesigner:
         td_sender = TouchDesignerSender(host=touchdesigner_host, port=touchdesigner_port)
