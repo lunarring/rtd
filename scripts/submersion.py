@@ -143,16 +143,22 @@ def get_sample_shape_unet(coord, noise_resolution_h, noise_resolution_w):
 
 if __name__ == "__main__":
 
-    do_main_projector = True
+    do_audiotorium_projector = True
+    res_factor = 1.5
+    aspect_ratio = 4.2/3
 
-    height_diffusion = int((384 + 96) * 1.5)  # 12 * (384 + 96) // 8
-    width_diffusion = int((512 + 128) * 1.5)  # 12 * (512 + 128) // 8
-    if do_main_projector:
+    if do_audiotorium_projector:
         height_render = 1080
-        width_render = 1920-512+128
+        width_render = int(height_render * aspect_ratio)
+
+        height_diffusion = int((480) * res_factor)  # 12 * (384 + 96) // 8
+        width_diffusion = int((480 * aspect_ratio) * res_factor)  # 12 * (512 + 128) // 8        
     else:
         height_render = 1080
         width_render = 1920
+
+        height_diffusion = int((384 + 96) * res_factor)  # 12 * (384 + 96) // 8
+        width_diffusion = int((512 + 128) * res_factor)  # 12 * (512 + 128) // 8
 
     n_frame_interpolations: int = 5
     shape_hw_cam = (576, 1024)
@@ -209,7 +215,7 @@ if __name__ == "__main__":
     renderer = lt.Renderer(
         width=width_render,
         height=height_render,
-        backend="opencv",
+        backend="gl",
         do_fullscreen=do_fullscreen,
     )
     cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=0)
@@ -291,7 +297,7 @@ if __name__ == "__main__":
         dyn_prompt_del_current = False  # meta_input.get(akai_midimix="F4", button_mode="released_once")
 
         do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="A3", button_mode="toggle", val_default=False)
-        do_motion_tracking_masking = meta_input.get(akai_midimix="A4", button_mode="toggle", val_default=False)
+        do_motion_tracking_masking = meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
         do_acid_wobblers = False  # meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
         do_infrared_colorize = False  # meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
@@ -318,6 +324,7 @@ if __name__ == "__main__":
         acid_saturation = meta_input.get(akai_midimix="B1", val_min=-15, val_max=15, val_default=0)
         acid_lightness = meta_input.get(akai_midimix="B2", val_min=-15, val_max=15, val_default=0)
         saturation = meta_input.get(akai_midimix="A1", val_min=0.0, val_max=2.0, val_default=1.0)  # Add saturation control
+        keypoint_mask_R = int(meta_input.get(akai_midimix="C5", val_min=5.0, val_max=60.0, val_default=30.0))
 
         if zoom_in_factor * zoom_out_factor == 0:
             zoom_factor = 1 - zoom_in_factor + zoom_out_factor
@@ -501,6 +508,7 @@ if __name__ == "__main__":
         input_image_processor.set_infrared_colorize(do_infrared_colorize)
         input_image_processor.set_opt_flow_threshold(opt_flow_threshold)
         input_image_processor.set_saturation(saturation)
+        input_image_processor.set_keypoint_mask_R(keypoint_mask_R)
         img_proc, human_seg_mask = input_image_processor.process(img_cam, opt_flow)
 
         # if not do_human_seg and not do_opt_flow_seg: VERY BAD, BREAKS COLOR SCALING!!!
