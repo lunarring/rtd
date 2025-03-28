@@ -326,8 +326,7 @@ class InputImageProcessor:
             
             # Apply saturation
             if self.saturation != 1.0:
-                img_hsv[:, :, 1] = np.clip(img_hsv[:, :, 1] * self.saturation, 0, 255)
-            
+                img_hsv[:, :, 1] = np.clip(img_hsv[:, :, 1] * self.saturation, 0, 1)
             # Apply brightness (V channel)
             if self.brightness != 1.0:
                 img_hsv[:, :, 2] = np.clip(img_hsv[:, :, 2] * self.brightness, 0, 255)
@@ -601,7 +600,7 @@ class AcidProcessor:
                 1.0 - self.acid_strength_foreground
             ) * img_input_torch + self.acid_strength_foreground * last_diffusion_image_torch
         else:
-            img_input_torch = (1.0 - self.acid_strength) * img_input_torch + self.acid_strength * last_diffusion_image_torch
+            img_input_torch = (1.0 - self.acid_strength_foreground) * img_input_torch + self.acid_strength_foreground * last_diffusion_image_torch
 
         # additive noise
         if self.coef_noise > 0:
