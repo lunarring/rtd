@@ -143,7 +143,7 @@ def get_sample_shape_unet(coord, noise_resolution_h, noise_resolution_w):
 if __name__ == "__main__":
 
     do_audiotorium_projector = True
-    res_factor = 1.5
+    res_factor = 1.25
     aspect_ratio = 4.2/3
 
     if do_audiotorium_projector:
@@ -159,8 +159,8 @@ if __name__ == "__main__":
         height_diffusion = int((384 + 96) * res_factor)  # 12 * (384 + 96) // 8
         width_diffusion = int((512 + 128) * res_factor)  # 12 * (512 + 128) // 8
 
-    n_frame_interpolations: int = 5
-    shape_hw_cam = (576, 1024)
+    shape_hw_cam = (2*1080//4, 2*1920//4)
+    #shape_hw_cam = (1080, 1920)
 
     touchdesigner_host = "192.168.100.101"  # Change to your TouchDesigner machine's IP
     touchdesigner_port = 9998
@@ -168,7 +168,7 @@ if __name__ == "__main__":
     do_realtime_transcription = True
     do_compile = True
     do_diffusion = True
-    do_fullscreen = True
+    do_fullscreen = False
     do_enable_dynamic_processor = False
     do_send_to_touchdesigner = False
     do_load_cam_input_from_file = False
@@ -217,9 +217,9 @@ if __name__ == "__main__":
         height=height_render,
         backend="pygame",
         do_fullscreen=do_fullscreen,
-        display_id=1
+        display_id=0
     )
-    cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=0)
+    cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=7, cam_id=0)
     cam.do_mirror = False
 
     # Initialize movie reader if loading from file
@@ -309,7 +309,7 @@ if __name__ == "__main__":
         do_postproc = meta_input.get(akai_midimix="D3", button_mode="toggle", val_default=False)
         do_blur = meta_input.get(akai_midimix="B3", button_mode="toggle", val_default=False)
         use_microphone_input = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
-        do_optical_flow = do_postproc or do_opt_flow_seg
+        do_opt_flow = do_postproc or do_opt_flow_seg
         # floats
         # nmb_inference_steps = meta_input.get(akai_midimix="B0", val_min=2, val_max=10.0, val_default=2.0)
         nmb_inference_steps = 3
@@ -326,6 +326,7 @@ if __name__ == "__main__":
         acid_lightness = meta_input.get(akai_midimix="B2", val_min=-15, val_max=15, val_default=0)
         saturation = meta_input.get(akai_midimix="A1", val_min=0.0, val_max=2.0, val_default=1.0)  # Add saturation control
         keypoint_mask_R = int(meta_input.get(akai_midimix="C5", val_min=5.0, val_max=60.0, val_default=30.0))
+        cam_exposure_buf_size = int(meta_input.get(akai_midimix="E0", val_min=1, val_max=20, val_default=1))
 
         if zoom_in_factor * zoom_out_factor == 0:
             zoom_factor = 1 - zoom_in_factor + zoom_out_factor
@@ -357,7 +358,7 @@ if __name__ == "__main__":
             rotation_angle = oscillator.get("rotation_angle", 1.0 / (0.5 * rotation_right), rotation_left, -rotation_right, "continuous")
 
         color_matching = meta_input.get(akai_lpd8="G0", akai_midimix="A5", val_min=0, val_max=1, val_default=0.5)
-        brightness = meta_input.get(akai_midimix="A2", val_min=0.0, val_max=2, val_default=2.0)
+        brightness = meta_input.get(akai_midimix="A2", val_min=0.0, val_max=2, val_default=1.0)
         # Add latent acid strength parameter
         # latent_acid_strength = meta_input.get(akai_midimix="D1", val_min=0, val_max=1.0, val_default=0.0)
         latent_acid_strength = 0.0
@@ -424,7 +425,7 @@ if __name__ == "__main__":
             if do_realtime_transcription:
                 if prompt_provider_stt.new_prompt_available():
                     current_prompt = prompt_provider_stt.last_prompt
-                    # print(f"New prompt: {current_prompt}")
+                    print(f"New prompt: {current_prompt}")
                     do_prompt_change = True
             else:
                 # print(f"New prompt: {current_prompt}")
@@ -469,6 +470,9 @@ if __name__ == "__main__":
             embeds = em.blend_two_embeds(embeds_source, embeds_target, fract_blend_embeds)
             de_img.set_embeddings(embeds)
 
+
+        cam.exposure_buf_size = cam_exposure_buf_size
+
         #
         # Get camera framerate from the camera thread
         camera_fps = cam.get_fps()
@@ -496,13 +500,13 @@ if __name__ == "__main__":
         fps_tracker.start_segment("OptFlow")
 
         try:
-            if do_optical_flow:
+            if do_opt_flow:
                 opt_flow = opt_flow_estimator.get_optflow(img_cam.copy(), low_pass_kernel_size=55, window_length=55)
             else:
                 opt_flow = None
         except:
             print("Error getting optical flow")
-            opt_flow = np.zeros((img_cam.shape[0], img_cam.shape[1], 2), dtype=np.float32)
+            opt_flow = None
 
         fps_tracker.start_segment("InImg")
         # Start timing image processing
@@ -525,7 +529,7 @@ if __name__ == "__main__":
         fps_tracker.start_segment("Acid")
         # Acid
         acid_processor.set_acid_strength(acid_strength)
-        #acid_processor.set_coef_noise(coef_noise)
+        acid_processor.set_coef_noise(coef_noise)
         acid_processor.set_acid_tracers(do_acid_tracers)
         acid_processor.set_acid_strength_foreground(acid_strength_foreground)
         acid_processor.set_zoom_factor(zoom_factor)
@@ -545,10 +549,10 @@ if __name__ == "__main__":
         de_img.set_num_inference_steps(int(nmb_inference_steps))
         de_img.set_strength(1 / de_img.num_inference_steps + 0.00001)
 
-        # add noise
-        #torch.manual_seed(de_img.seed)
-        #noise = torch.randn_like(de_img.latents) * coef_noise
-        #de_img.pipe.noise_img2img = noise
+        # add latent noise
+        # torch.manual_seed(de_img.seed)
+        # noise = torch.randn_like(de_img.latents) * coef_noise * 100
+        # de_img.pipe.noise_img2img = noise
 
         fps_tracker.start_segment("Diffu")
         img_diffusion = np.array(de_img.generate())
