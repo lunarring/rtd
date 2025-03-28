@@ -159,10 +159,6 @@ if __name__ == "__main__":
     do_send_to_touchdesigner = False
     do_load_cam_input_from_file = True
     do_save_diffusion_output_to_file = False
-<<<<<<< HEAD
-=======
-    do_realtime_transcription = True
->>>>>>> 4ea0ee78a296d44945543a05d3a6345d12b91cb6
     video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
     print(video_file_path_input)
     video_file_path_output = "materials/videos/long_cut_diffusion2.mp4"
