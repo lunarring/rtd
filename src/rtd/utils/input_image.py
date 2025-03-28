@@ -8,7 +8,11 @@ from .segmentation_detection import HumanSeg
 import lunar_tools as lt
 from PIL import Image
 from .infrared.colorize_infrared import ImageColorizationPipelineHF
-from motion.motion_tracking import MotionTracker
+
+try:
+    from motion.motion_tracking import MotionTracker
+except Exception as e:
+    print(f"MotionTracker not found! {e}. Motion tracking masking will not be applied.")
 
 
 def img2tensor(tensor):
@@ -142,7 +146,7 @@ class InputImageProcessor:
     def __init__(self, do_human_seg=True, do_blur=False, blur_kernel=3, do_infrared_colorize=False, device="cuda"):
         self.device = device
         self.brightness = 1.0
-        self.saturization = 1.0
+        self.saturation = 1.0
         self.hue_rotation_angle = 0
         self.blur = None
         self.blur_kernel = blur_kernel
@@ -186,8 +190,8 @@ class InputImageProcessor:
     def set_brightness(self, brightness=1):
         self.brightness = brightness
 
-    def set_saturization(self, saturization):
-        self.saturization = saturization
+    def set_saturation(self, saturation):
+        self.saturation = saturation
 
     def set_hue_rotation(self, hue_rotation_angle=0):
         self.hue_rotation_angle = hue_rotation_angle
@@ -311,24 +315,27 @@ class InputImageProcessor:
         #     self.list_history_frames = self.list_history_frames[1:]
         #     img = np.mean(np.stack(self.list_history_frames), axis=0)
 
-        img *= self.brightness
-        img = np.clip(img, 0, 255)
-        img = img.astype(np.uint8)
-
-        if self.saturization != 1.0 or self.hue_rotation_angle != 0:
-            # convert the image to HSV
-            img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype(float)
-            # adjust saturization
-            img_hsv[:, :, 1] *= self.saturization
-
-            # Rotate the hue
-            # Hue is represented in OpenCV as a value from 0 to 180 instead of 0 to 360...
-            img_hsv[:, :, 0] = (img_hsv[:, :, 0] + (self.hue_rotation_angle)) % 180
-
-            # clip the values to stay in valid range
-            img_hsv[:, :, 1] = np.clip(img_hsv[:, :, 1], 0, 255)
-            # convert the image back to BGR
-            img = cv2.cvtColor(img_hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+        # HSV color space adjustment
+        if self.saturation != 1.0 or self.hue_rotation_angle != 0.0 or self.brightness != 1.0:
+            # Convert to HSV
+            img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            
+            # Apply hue rotation
+            if self.hue_rotation_angle != 0.0:
+                img_hsv[:, :, 0] = (img_hsv[:, :, 0] + self.hue_rotation_angle) % 180
+            
+            # Apply saturation
+            if self.saturation != 1.0:
+                img_hsv[:, :, 1] = np.clip(img_hsv[:, :, 1] * self.saturation, 0, 255)
+            
+            # Apply brightness (V channel)
+            if self.brightness != 1.0:
+                img_hsv[:, :, 2] = np.clip(img_hsv[:, :, 2] * self.brightness, 0, 255)
+            
+            # Convert back to BGR
+            img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR)
+        else:
+            img = img.astype(np.uint8)
 
         return img, human_seg_mask
 
