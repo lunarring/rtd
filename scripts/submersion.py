@@ -166,7 +166,7 @@ if __name__ == "__main__":
     touchdesigner_host = "192.168.100.101"  # Change to your TouchDesigner machine's IP
     touchdesigner_port = 9998
 
-    do_realtime_transcription = False
+    do_realtime_transcription = True
     do_compile = True
     do_diffusion = True
     do_fullscreen = True
@@ -174,6 +174,7 @@ if __name__ == "__main__":
     do_send_to_touchdesigner = False
     do_load_cam_input_from_file = False
     do_save_diffusion_output_to_file = False
+    
     video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
     print(video_file_path_input)
     video_file_path_output = "materials/videos/long_cut_diffusion2.mp4"
@@ -252,7 +253,7 @@ if __name__ == "__main__":
     )
     speech_detector = lt.Speech2Text()
 
-    if do_realtime_transcription:
+    if not do_realtime_transcription:
         prompt_provider_stt = PromptProviderSpeechToText(
             init_prompt="A beautiful water sea",
             llm_system_prompt=(vis_llm_prompt),
@@ -308,6 +309,7 @@ if __name__ == "__main__":
         # do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=True)
         do_postproc = meta_input.get(akai_midimix="D3", button_mode="toggle", val_default=False)
         do_blur = meta_input.get(akai_midimix="B3", button_mode="toggle", val_default=False)
+        use_microphone_input = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=False)
         do_optical_flow = do_postproc or do_opt_flow_seg
         # floats
         # nmb_inference_steps = meta_input.get(akai_midimix="B0", val_min=2, val_max=10.0, val_default=2.0)
@@ -419,21 +421,22 @@ if __name__ == "__main__":
         #     print(f'dynamic processor is currently not compatible with compile mode')
         #     do_dynamic_processor = False
 
-        if not do_realtime_transcription:
-            new_diffusion_prompt_available_from_mic = prompt_provider_mic.handle_unmute_button(new_prompt_mic_unmuter)
+        if use_microphone_input:
+            if do_realtime_transcription:
+                new_diffusion_prompt_available_from_mic = prompt_provider_mic.handle_unmute_button(new_prompt_mic_unmuter)
 
-            if new_diffusion_prompt_available_from_mic:
-                current_prompt = prompt_provider_mic.get_current_prompt()
-                do_prompt_change = True
-        else:
-            if prompt_provider_stt.new_prompt_available():
-                current_prompt = prompt_provider_stt.last_prompt
-                do_prompt_change = True
+                if new_diffusion_prompt_available_from_mic:
+                    current_prompt = prompt_provider_mic.get_current_prompt()
+                    do_prompt_change = True
+            else:
+                if prompt_provider_stt.new_prompt_available():
+                    current_prompt = prompt_provider_stt.last_prompt
+                    do_prompt_change = True
 
-            # print(f"New prompt: {current_prompt}")
-            # if do_diffusion:
-            #     embeds = em.encode_prompt(current_prompt)
-            #     de_img.set_embeddings(embeds)
+                # print(f"New prompt: {current_prompt}")
+                # if do_diffusion:
+                #     embeds = em.encode_prompt(current_prompt)
+                #     de_img.set_embeddings(embeds)
 
         if do_cycle_prompt_from_file:
             prompt_provider_txt_file.handle_prompt_cycling_button(do_cycle_prompt_from_file)
