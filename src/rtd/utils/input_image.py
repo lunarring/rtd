@@ -317,12 +317,15 @@ class InputImageProcessor:
 
         # HSV color space adjustment
         if self.saturation != 1.0 or self.hue_rotation_angle != 0.0 or self.brightness != 1.0:
-            # Convert to HSV
-            img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            # Convert RGB to HSV (since our input is in RGB format)
+            img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)
             
-            # Apply hue rotation
+            # Convert to float for calculations
+            img_hsv = img_hsv.astype(np.float32)
+            
+            # Apply hue rotation (OpenCV uses 0-180 range for hue)
             if self.hue_rotation_angle != 0.0:
-                img_hsv[:, :, 0] = (img_hsv[:, :, 0] + self.hue_rotation_angle) % 180
+                img_hsv[:, :, 0] = (img_hsv[:, :, 0] + self.hue_rotation_angle) % 180.0
             
             # Apply saturation
             if self.saturation != 1.0:
@@ -332,8 +335,8 @@ class InputImageProcessor:
             if self.brightness != 1.0:
                 img_hsv[:, :, 2] = np.clip(img_hsv[:, :, 2] * self.brightness, 0, 255)
             
-            # Convert back to BGR
-            img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR)
+            # Convert back to RGB (not BGR)
+            img = cv2.cvtColor(img_hsv.astype(np.uint8), cv2.COLOR_HSV2RGB)
         else:
             img = img.astype(np.uint8)
 
