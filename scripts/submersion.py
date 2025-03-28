@@ -166,13 +166,13 @@ if __name__ == "__main__":
     touchdesigner_host = "192.168.100.101"  # Change to your TouchDesigner machine's IP
     touchdesigner_port = 9998
 
-    do_realtime_transcription = True
+    do_realtime_transcription = False
     do_compile = True
     do_diffusion = True
     do_fullscreen = True
     do_enable_dynamic_processor = False
     do_send_to_touchdesigner = False
-    do_load_cam_input_from_file = False
+    do_load_cam_input_from_file = True
     do_save_diffusion_output_to_file = False
     
     video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
