@@ -18,7 +18,7 @@ import os
 from openai import AsyncOpenAI
 
 # Configure logging first before any imports that might use it
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 logger = logging.getLogger("speech_to_text")
 
 # For MP3 support
@@ -37,6 +37,7 @@ from agents.voice.model import STTModelSettings
 
 # Suppress errors from OpenAI agents - completely silence them
 logging.getLogger("openai").setLevel(logging.CRITICAL)
+logging.getLogger("openai.http_client").setLevel(logging.DEBUG)  # Set HTTP client logs to DEBUG level
 logging.getLogger("agents").setLevel(logging.CRITICAL)
 
 # Also suppress specific error messages from lower level loggers
@@ -67,10 +68,11 @@ class SpeechToTextStreamer:
         llm_system_prompt="Describe the image in detail in vivid colors given what was said",
         llm_max_tokens=100,
         llm_temperature=0.7,
-        llm_min_words=3,
-        llm_max_words=50,
+        llm_min_words=2,
+        llm_max_words=33,
         audio_file=None,
         min_time_passed=2.0,
+        eagerness="high",
     ):
         self.client = client
         self.audio_input = None
@@ -90,6 +92,8 @@ class SpeechToTextStreamer:
         self.last_transcript_words = 0
         # Time between transcript checks
         self.min_time_passed = min_time_passed
+        # Transcription eagerness setting
+        self.eagerness = eagerness
 
         # Audio source setup
         # Path to audio file (if using file input)
@@ -141,7 +145,7 @@ class SpeechToTextStreamer:
         settings = STTModelSettings(
             language="en",  # Force English language transcription
             # Configure turn detection (lower eagerness means wait longer)
-            turn_detection={"type": "semantic_vad", "eagerness": "low"},  # Options: high, medium, low
+            turn_detection={"type": "semantic_vad", "eagerness": self.eagerness},  # Options: high, medium, low
             # Add prompt for English transcription
             prompt="Transcribe the following audio in English language only",
             temperature=0,  # Lower temperature for more deterministic results
@@ -328,10 +332,12 @@ class SpeechToTextStreamer:
                 self.new_transcript_available = True
 
                 # Directly update latest transcript for LLM processing if enabled
-                # This makes LLM processing independent of is_new_transcript() checks
-                if self.use_llm and len(transcription.split()) >= self.llm_min_words:
-                    # Pass the raw transcription directly to LLM processing
-                    self.latest_transcript = transcription
+                # Get accumulated transcript for LLM instead of just the latest utterance
+                if self.use_llm:
+                    # Use get_transcript to get the full context (all words within time window)
+                    full_transcript = self.get_transcript(delta_time=30, min_words=self.llm_min_words, max_words=self.llm_max_words)
+                    if full_transcript:
+                        self.latest_transcript = full_transcript
 
                 logger.debug(f"Transcription: {transcription}")
         except asyncio.CancelledError:
@@ -456,11 +462,12 @@ class SpeechToTextStreamer:
     async def llm_processing_loop(self):
         """Background loop to process transcripts with LLM"""
         logger.info("Starting LLM processing loop")
+        last_processed_transcript = ""
         while self.running:
-            if self.latest_transcript:
+            if self.latest_transcript and self.latest_transcript != last_processed_transcript:
                 transcript = self.latest_transcript
-                # Clear to avoid duplicate processing
-                self.latest_transcript = ""
+                # Save to avoid duplicate processing
+                last_processed_transcript = transcript
 
                 logger.info(f"LLM processing transcript: {transcript}")
 
@@ -469,7 +476,6 @@ class SpeechToTextStreamer:
                 if response:
                     self.latest_llm_response = response
                     self.new_llm_response = True
-                    logger.info(f"LLM processed: {transcript}")
                     logger.info(f"LLM response: {response}")
                 else:
                     logger.warning(f"LLM returned no response for: {transcript}")
@@ -537,19 +543,6 @@ class SpeechToTextStreamer:
 if __name__ == "__main__":
     print("Starting Speech-to-Text Streaming application")
 
-    import argparse
-
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description="Speech-to-Text Streaming Application")
-    parser.add_argument("--file", type=str, help="Path to audio file (WAV or MP3 format) instead of using microphone")
-    parser.add_argument("--model", type=str, default="gpt-4o-2024-08-06", help="LLM model to use for processing transcripts")
-    parser.add_argument("--max-tokens", type=int, default=500, help="Maximum tokens in LLM response")
-    parser.add_argument("--no-llm", action="store_true", help="Disable LLM processing")
-    parser.add_argument("--no-transcript", action="store_true", help="Disable transcript display (LLM still works)")
-    parser.add_argument("--min-time-passed", type=float, default=1.0, help="Minimum time (in seconds) between transcript checks")
-
-    args = parser.parse_args()
-
     prompt = """Your task is to directly translate from poetry into visual descriptions. I give you couple examples and you can do it then for the next one. Here are rules: Your task is to produce a valid and new output. Keep the style and length of the examples in your output. Don't make it longer.
 
 Input: The surface is not motionless. Output: Waves on the surface of endless blue ocean and flickering, silver light 
@@ -579,31 +572,14 @@ Input: The Pattern of Movement, a ripple Output: trembling  pattern of movement 
 The next message I send you will be an Input, and you directly continue after 'Output:'
 """
 
-    # Instantiate the SpeechToTextStreamer with custom settings
+    # Instantiate the SpeechToTextStreamer with default settings
     streamer = SpeechToTextStreamer(
-        use_llm=not args.no_llm,
-        llm_model=args.model,
         llm_system_prompt=prompt,
-        llm_max_tokens=args.max_tokens,
-        llm_temperature=0.5,
-        llm_min_words=3,
-        llm_max_words=40,
-        audio_file=args.file,
-        min_time_passed=args.min_time_passed,
     )
-
-    # streamer = SpeechToTextStreamer(
-    #     use_llm=True,
-    # )
 
     try:
         # Main thread runs a synchronous heartbeat loop
         while True:
-            # Check for new transcript unless disabled
-            # if not args.no_transcript and streamer.is_new_transcript(min_extra_words=1):
-            #     transcript = streamer.get_transcript(min_words=1, max_words=20)
-            #     print(f"Latest transcript: {transcript}")
-
             # Check for new LLM responses
             if streamer.is_new_llm_response():
                 llm_response = streamer.get_llm_response()
