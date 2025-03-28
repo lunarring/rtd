@@ -1,4 +1,8 @@
 # Byte-compiled / optimized / DLL files
+models/*
+cache/*
+DEADJOE
+*.toml~
 *.txt
 *.mp4
 src/rtd/dynamic_processor/dynamic_module.py
