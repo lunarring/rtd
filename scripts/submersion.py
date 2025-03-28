@@ -166,10 +166,10 @@ if __name__ == "__main__":
     touchdesigner_host = "192.168.100.101"  # Change to your TouchDesigner machine's IP
     touchdesigner_port = 9998
 
-    do_realtime_transcription = False
+    do_realtime_transcription = True
     do_compile = True
     do_diffusion = True
-    do_fullscreen = False
+    do_fullscreen = True
     do_enable_dynamic_processor = False
     do_send_to_touchdesigner = False
     do_load_cam_input_from_file = False
@@ -216,8 +216,9 @@ if __name__ == "__main__":
     renderer = lt.Renderer(
         width=width_render,
         height=height_render,
-        backend="gl",
+        backend="pygame",
         do_fullscreen=do_fullscreen,
+        display_id=1
     )
     cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=0)
     cam.do_mirror = False
@@ -309,7 +310,7 @@ if __name__ == "__main__":
         # do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=True)
         do_postproc = meta_input.get(akai_midimix="D3", button_mode="toggle", val_default=False)
         do_blur = meta_input.get(akai_midimix="B3", button_mode="toggle", val_default=False)
-        use_microphone_input = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=False)
+        use_microphone_input = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
         do_optical_flow = do_postproc or do_opt_flow_seg
         # floats
         # nmb_inference_steps = meta_input.get(akai_midimix="B0", val_min=2, val_max=10.0, val_default=2.0)
