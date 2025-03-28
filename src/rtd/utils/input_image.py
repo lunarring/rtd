@@ -9,10 +9,14 @@ import lunar_tools as lt
 from PIL import Image
 from .infrared.colorize_infrared import ImageColorizationPipelineHF
 
+<<<<<<< HEAD
 try:
     from motion.motion_tracking import MotionTracker
 except Exception as e:
     print(f"MotionTracker not found! {e}. Motion tracking masking will not be applied.")
+=======
+# from motion.motion_tracking import MotionTracker
+>>>>>>> 4ea0ee78a296d44945543a05d3a6345d12b91cb6
 
 
 def img2tensor(tensor):
