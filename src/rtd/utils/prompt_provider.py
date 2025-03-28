@@ -12,10 +12,7 @@ import argparse
 from signal import signal, SIGINT
 
 # Import from RTD modules
-try:
-    from rtd.voice.speech_to_text_streaming import SpeechToTextStreamer
-except Exception as e:
-    print(f"SpeechToTextStreamer not found! {e}. Speech-to-text will not be available.")
+from rtd.voice.speech_to_text_streaming import SpeechToTextStreamer
 
 
 # Configure logging
@@ -205,10 +202,7 @@ class PromptProviderSpeechToText(PromptProvider):
         init_prompt: str = "Image of a cat",
         use_llm: bool = True,
         llm_model: str = "gpt-4o-2024-08-06",
-        llm_system_prompt: str = (
-            "Convert the user's speech into concise, vivid image generation prompts. "
-            "Focus on visual elements and artistic style. Keep it under 20 words."
-        ),
+        llm_system_prompt: str = "Convert the user's speech into concise, vivid image generation prompts. Focus on visual elements and artistic style. Keep it under 20 words.",
         max_tokens: int = 100,
         temperature: float = 0.7,
         min_words: int = 3,
@@ -285,7 +279,7 @@ if __name__ == "__main__":
     # Create a speech-to-text prompt provider with default settings
     stt_provider = PromptProviderSpeechToText(
         init_prompt="A colorful sunset over mountains",
-        llm_system_prompt=("Convert speech to vivid image prompts. Focus on visual elements."),
+        llm_system_prompt="Convert speech to vivid image prompts. Focus on visual elements.",
         temperature=0.8,
     )
 
