@@ -138,7 +138,7 @@ class PromptProviderTxtFile:
         Reload prompts from the text file.
         """
         try:
-            with open(self.txt_file_path, "r") as f:
+            with open(self.txt_file_path, "r", encoding="utf-8") as f:
                 self.prompts = [line.strip() for line in f.readlines() if len(line.strip()) > 0]
             # For sequential mode, reset the index
             if self.mode == "sequential":

@@ -9,10 +9,8 @@ import lunar_tools as lt
 from PIL import Image
 from .infrared.colorize_infrared import ImageColorizationPipelineHF
 
-try:
-    from motion.motion_tracking import MotionTracker
-except Exception as e:
-    print(f"MotionTracker not found! {e}. Motion tracking masking will not be applied.")
+
+from motion.motion_tracking import MotionTracker
 
 
 def img2tensor(tensor):
@@ -159,8 +157,7 @@ class InputImageProcessor:
 
         try:
             from motion.motion_tracking import MotionTracker
-
-            self.motion_tracker = MotionTracker()
+            self.motion_tracker = MotionTracker(max_people=3)
         except Exception as e:
             print(f"MotionTracker not found! {e}. Motion tracking masking will not be applied.")
 
@@ -180,6 +177,7 @@ class InputImageProcessor:
         self.opt_flow_blur_sigma = 5
         self.flip_axis = None
         self.do_motion_tracking_masking = False
+        self.keypoint_mask_R = 30
 
         self.list_history_frames = []
 
@@ -223,6 +221,9 @@ class InputImageProcessor:
 
     def set_motion_tracking_masking(self, do_motion_tracking_masking=True):
         self.do_motion_tracking_masking = do_motion_tracking_masking
+        
+    def set_keypoint_mask_R(self, keypoint_mask_R):
+        self.keypoint_mask_R = keypoint_mask_R
 
     def create_opt_flow_mask(self, opt_flow):
         """Create a mask from optical flow data."""
@@ -267,7 +268,7 @@ class InputImageProcessor:
         # Get human segmentation mask if enabled
         if self.do_human_seg:
             if self.do_motion_tracking_masking:
-                human_seg_mask = self.motion_tracker.return_mask(img)
+                human_seg_mask = self.motion_tracker.return_mask(img, keypoint_mask_R=self.keypoint_mask_R)
             else:
                 human_seg_mask = self.human_seg.get_mask(img)
 

@@ -143,16 +143,22 @@ def get_sample_shape_unet(coord, noise_resolution_h, noise_resolution_w):
 
 if __name__ == "__main__":
 
-    do_main_projector = True
+    do_audiotorium_projector = True
+    res_factor = 1.5
+    aspect_ratio = 4.2/3
 
-    height_diffusion = int((384 + 96) * 1.5)  # 12 * (384 + 96) // 8
-    width_diffusion = int((512 + 128) * 1.5)  # 12 * (512 + 128) // 8
-    if do_main_projector:
+    if do_audiotorium_projector:
         height_render = 1080
-        width_render = 1920-512+128
+        width_render = int(height_render * aspect_ratio)
+
+        height_diffusion = int((480) * res_factor)  # 12 * (384 + 96) // 8
+        width_diffusion = int((480 * aspect_ratio) * res_factor)  # 12 * (512 + 128) // 8        
     else:
         height_render = 1080
         width_render = 1920
+
+        height_diffusion = int((384 + 96) * res_factor)  # 12 * (384 + 96) // 8
+        width_diffusion = int((512 + 128) * res_factor)  # 12 * (512 + 128) // 8
 
     n_frame_interpolations: int = 5
     shape_hw_cam = (576, 1024)
@@ -160,7 +166,7 @@ if __name__ == "__main__":
     touchdesigner_host = "192.168.100.101"  # Change to your TouchDesigner machine's IP
     touchdesigner_port = 9998
 
-    do_realtime_transcription = False
+    do_realtime_transcription = True
     do_compile = True
     do_diffusion = True
     do_fullscreen = True
@@ -168,6 +174,7 @@ if __name__ == "__main__":
     do_send_to_touchdesigner = False
     do_load_cam_input_from_file = False
     do_save_diffusion_output_to_file = False
+    
     video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
     print(video_file_path_input)
     video_file_path_output = "materials/videos/long_cut_diffusion2.mp4"
@@ -209,7 +216,7 @@ if __name__ == "__main__":
     renderer = lt.Renderer(
         width=width_render,
         height=height_render,
-        backend="opencv",
+        backend="gl",
         do_fullscreen=do_fullscreen,
     )
     cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=3, cam_id=0)
@@ -246,7 +253,7 @@ if __name__ == "__main__":
     )
     speech_detector = lt.Speech2Text()
 
-    if do_realtime_transcription:
+    if not do_realtime_transcription:
         prompt_provider_stt = PromptProviderSpeechToText(
             init_prompt="A beautiful water sea",
             llm_system_prompt=(vis_llm_prompt),
@@ -291,7 +298,7 @@ if __name__ == "__main__":
         dyn_prompt_del_current = False  # meta_input.get(akai_midimix="F4", button_mode="released_once")
 
         do_human_seg = meta_input.get(akai_lpd8="B1", akai_midimix="A3", button_mode="toggle", val_default=False)
-        do_motion_tracking_masking = meta_input.get(akai_midimix="A4", button_mode="toggle", val_default=False)
+        do_motion_tracking_masking = meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
         do_acid_wobblers = False  # meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
         do_infrared_colorize = False  # meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
         do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
@@ -302,6 +309,7 @@ if __name__ == "__main__":
         # do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=True)
         do_postproc = meta_input.get(akai_midimix="D3", button_mode="toggle", val_default=False)
         do_blur = meta_input.get(akai_midimix="B3", button_mode="toggle", val_default=False)
+        use_microphone_input = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=False)
         do_optical_flow = do_postproc or do_opt_flow_seg
         # floats
         # nmb_inference_steps = meta_input.get(akai_midimix="B0", val_min=2, val_max=10.0, val_default=2.0)
@@ -318,6 +326,7 @@ if __name__ == "__main__":
         acid_saturation = meta_input.get(akai_midimix="B1", val_min=-15, val_max=15, val_default=0)
         acid_lightness = meta_input.get(akai_midimix="B2", val_min=-15, val_max=15, val_default=0)
         saturation = meta_input.get(akai_midimix="A1", val_min=0.0, val_max=2.0, val_default=1.0)  # Add saturation control
+        keypoint_mask_R = int(meta_input.get(akai_midimix="C5", val_min=5.0, val_max=60.0, val_default=30.0))
 
         if zoom_in_factor * zoom_out_factor == 0:
             zoom_factor = 1 - zoom_in_factor + zoom_out_factor
@@ -412,21 +421,22 @@ if __name__ == "__main__":
         #     print(f'dynamic processor is currently not compatible with compile mode')
         #     do_dynamic_processor = False
 
-        if not do_realtime_transcription:
-            new_diffusion_prompt_available_from_mic = prompt_provider_mic.handle_unmute_button(new_prompt_mic_unmuter)
+        if use_microphone_input:
+            if do_realtime_transcription:
+                new_diffusion_prompt_available_from_mic = prompt_provider_mic.handle_unmute_button(new_prompt_mic_unmuter)
 
-            if new_diffusion_prompt_available_from_mic:
-                current_prompt = prompt_provider_mic.get_current_prompt()
-                do_prompt_change = True
-        else:
-            if prompt_provider_stt.new_prompt_available():
-                current_prompt = prompt_provider_stt.last_prompt
-                do_prompt_change = True
+                if new_diffusion_prompt_available_from_mic:
+                    current_prompt = prompt_provider_mic.get_current_prompt()
+                    do_prompt_change = True
+            else:
+                if prompt_provider_stt.new_prompt_available():
+                    current_prompt = prompt_provider_stt.last_prompt
+                    do_prompt_change = True
 
-            # print(f"New prompt: {current_prompt}")
-            # if do_diffusion:
-            #     embeds = em.encode_prompt(current_prompt)
-            #     de_img.set_embeddings(embeds)
+                # print(f"New prompt: {current_prompt}")
+                # if do_diffusion:
+                #     embeds = em.encode_prompt(current_prompt)
+                #     de_img.set_embeddings(embeds)
 
         if do_cycle_prompt_from_file:
             prompt_provider_txt_file.handle_prompt_cycling_button(do_cycle_prompt_from_file)
@@ -501,6 +511,7 @@ if __name__ == "__main__":
         input_image_processor.set_infrared_colorize(do_infrared_colorize)
         input_image_processor.set_opt_flow_threshold(opt_flow_threshold)
         input_image_processor.set_saturation(saturation)
+        input_image_processor.set_keypoint_mask_R(keypoint_mask_R)
         img_proc, human_seg_mask = input_image_processor.process(img_cam, opt_flow)
 
         # if not do_human_seg and not do_opt_flow_seg: VERY BAD, BREAKS COLOR SCALING!!!
