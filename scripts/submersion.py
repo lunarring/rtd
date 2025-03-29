@@ -212,7 +212,7 @@ if __name__ == "__main__":
         do_realtime_transcription = True
         do_compile = True
         do_diffusion = True
-        do_fullscreen = False
+        do_fullscreen = True
         do_enable_dynamic_processor = False
         do_send_to_touchdesigner = False
         do_load_cam_input_from_file = False
@@ -307,7 +307,7 @@ if __name__ == "__main__":
             prompt_provider_mic = PromptProviderMicrophone(init_prompt="A beautiful landscape")
 
         prompt_provider_txt_file = PromptProviderTxtFile(
-            get_repo_path("materials/prompts/gosia_cooked.txt", __file__), mode="sequential"  # Can be "random" or "sequential"
+            get_repo_path("materials/prompts/gosia_cooked_6prompts.txt", __file__), mode="sequential"  # Can be "random" or "sequential"
         )
         opt_flow_estimator = OpticalFlowEstimator(use_ema=False)
 
@@ -346,6 +346,7 @@ if __name__ == "__main__":
             do_acid_wobblers = False  # meta_input.get(akai_lpd8="C1", akai_midimix="D3", button_mode="toggle", val_default=False)
             do_infrared_colorize = False  # meta_input.get(akai_lpd8="D0", akai_midimix="H4", button_mode="toggle", val_default=False)
             do_debug_seethrough = meta_input.get(akai_lpd8="D1", akai_midimix="H3", button_mode="toggle", val_default=False)
+            restart_stt = meta_input.get(akai_midimix="G4", val_default=False, button_mode="pressed_once")
             do_audio_modulation = False  # meta_input.get(akai_midimix="D4", button_mode="toggle", val_default=False)
             do_param_oscillators = False  # meta_input.get(akai_midimix="C3", button_mode="toggle", val_default=False)
             #do_opt_flow_seg = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=False)
@@ -373,6 +374,12 @@ if __name__ == "__main__":
             keypoint_mask_R = int(meta_input.get(akai_midimix="C5", val_min=5.0, val_max=60.0, val_default=30.0))
             cam_exposure_buf_size = int(meta_input.get(akai_midimix="E0", val_min=1, val_max=20, val_default=1))
             human_seg_resize_factor = meta_input.get(akai_midimix="E2", val_min=0.1, val_max=1.0, val_default=0.5)
+
+            if restart_stt:
+                prompt_provider_stt = PromptProviderSpeechToText(
+                    init_prompt="A beautiful water sea",
+                    llm_system_prompt=vis_llm_prompt,
+                )
 
             if zoom_in_factor * zoom_out_factor == 0:
                 zoom_factor = 1 - zoom_in_factor + zoom_out_factor
@@ -470,8 +477,8 @@ if __name__ == "__main__":
             if use_microphone_input:
                 if do_realtime_transcription:
                     if prompt_provider_stt.new_prompt_available():
-                        # current_prompt = prompt_provider_stt.last_prompt
-                        current_prompt = prompt_provider_stt.streamer.get_latest_transcript()
+                        current_prompt = prompt_provider_stt.last_prompt
+                        # current_prompt = prompt_provider_stt.streamer.get_latest_transcript()
                         print(f"New prompt injected from STT: {current_prompt}")
                         do_prompt_change = True
                 else:
