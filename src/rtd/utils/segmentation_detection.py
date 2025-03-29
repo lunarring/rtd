@@ -72,7 +72,11 @@ class HumanSeg:
         input_tensor = self.preprocess(input_img.copy())
         
         if self.resizing_factor is not None or self.size is not None:
-            input_tensor = lt.resize(input_tensor, resizing_factor=self.resizing_factor, size=self.size)
+            if self.size is not None:
+                print(self.size)
+                input_tensor = lt.resize(input_tensor, size=self.size, resample_method='bilinear')
+            else:
+                input_tensor = lt.resize(input_tensor, resizing_factor=self.resizing_factor, resample_method='bilinear')
         
         input_batch = input_tensor.unsqueeze(0)
         input_batch = input_batch.to(self.device)
