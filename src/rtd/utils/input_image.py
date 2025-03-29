@@ -582,7 +582,7 @@ class AcidProcessor:
 
         img_input_torch = torch.from_numpy(image_input.copy()).to(self.device).float()
         if img_input_torch.shape[0] != height_diffusion or img_input_torch.shape[1] != width_diffusion:
-            print(f"Resizing image from {img_input_torch.shape[0]}x{img_input_torch.shape[1]} to {height_diffusion}x{width_diffusion}, this is not a good idea.")
+            # print(f"Resizing image from {img_input_torch.shape[0]}x{img_input_torch.shape[1]} to {height_diffusion}x{width_diffusion}, this is not a good idea.")
             img_input_torch = lt.resize(
                 img_input_torch.permute((2, 0, 1)),
                 size=(height_diffusion, width_diffusion),

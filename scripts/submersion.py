@@ -145,7 +145,7 @@ def center_crop_to_size(img, target_height, target_width):
     
     # If image is too small, resize it first
     if h < target_height or w < target_width:
-        # print(f"Warning: Image too small ({h}x{w}), resizing to match target size ({target_height}x{target_width})")
+        print(f"Warning: Image too small ({h}x{w}), resizing to match target size ({target_height}x{target_width})")
         # Calculate scaling factor to make the smaller dimension match target
         scale_h = target_height / h
         scale_w = target_width / w
@@ -161,7 +161,24 @@ def center_crop_to_size(img, target_height, target_width):
     start_h = (h - target_height) // 2
     start_w = (w - target_width) // 2
     
-    return img[start_h:start_h + target_height, start_w:start_w + target_width]
+    # Ensure we don't get negative indices
+    if start_h < 0 or start_w < 0:
+        print(f"Warning: Negative crop indices detected. Resizing image to exact target size.")
+        img = cv2.resize(img, (target_width, target_height), interpolation=cv2.INTER_LINEAR)
+        return img
+    
+    # Perform the crop
+    cropped = img[start_h:start_h + target_height, start_w:start_w + target_width]
+    
+    # Verify output dimensions
+    if cropped.shape[0] != target_height or cropped.shape[1] != target_width:
+        print(f"Warning: Crop dimensions mismatch. Expected {target_height}x{target_width}, got {cropped.shape[0]}x{cropped.shape[1]}")
+        # If dimensions don't match, resize to exact target size
+        cropped = cv2.resize(cropped, (target_width, target_height), interpolation=cv2.INTER_LINEAR)
+    
+    assert cropped.shape[0] == target_height and cropped.shape[1] == target_width
+    
+    return cropped
 
 
 if __name__ == "__main__":
@@ -183,7 +200,7 @@ if __name__ == "__main__":
         height_diffusion = int((384 + 96) * res_factor)  # 12 * (384 + 96) // 8
         width_diffusion = int((512 + 128) * res_factor)  # 12 * (512 + 128) // 8
 
-    shape_hw_cam = (2*1080//4, 2*1920//4)
+    shape_hw_cam = (1080//2, 1920//2)
     #shape_hw_cam = (1080, 1920)
 
     touchdesigner_host = "192.168.100.101"  # Change to your TouchDesigner machine's IP
@@ -195,7 +212,7 @@ if __name__ == "__main__":
     do_fullscreen = False
     do_enable_dynamic_processor = False
     do_send_to_touchdesigner = False
-    do_load_cam_input_from_file = True
+    do_load_cam_input_from_file = False
     do_save_diffusion_output_to_file = False
     
     video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
@@ -331,7 +348,7 @@ if __name__ == "__main__":
         do_opt_flow_seg = False
         # do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=True)
         do_postproc = meta_input.get(akai_midimix="D3", button_mode="toggle", val_default=False)
-        do_blur = meta_input.get(akai_midimix="B3", button_mode="toggle", val_default=False)
+        do_blur = meta_input.get(akai_lpd8="B3", button_mode="toggle", val_default=False)
         use_microphone_input = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
         do_opt_flow = do_postproc or do_opt_flow_seg
         # floats
@@ -521,8 +538,9 @@ if __name__ == "__main__":
                 img_cam = img_cam[:, :, ::-1].copy()
 
             # Center crop to exact target dimensions
-            img_cam = center_crop_to_size(img_cam, height_diffusion, width_diffusion)
-
+        print(f"img_cam.shape before: {img_cam.shape}")
+        img_cam = center_crop_to_size(img_cam, height_diffusion, width_diffusion)
+        print(f"img_cam.shape: {img_cam.shape}")
         # print(f"img_cam.shape: {img_cam.shape} aspect_ratio: {img_cam.shape[1]/img_cam.shape[0]}")
         img_cam_last = img_cam.copy()
 
