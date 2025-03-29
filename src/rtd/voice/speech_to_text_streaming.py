@@ -516,6 +516,10 @@ class SpeechToTextStreamer:
         """Get the latest LLM response"""
         return self.latest_llm_response
 
+    def get_latest_transcript(self):
+        """Get the latest LLM response"""
+        return self.latest_transcript 
+
     def stop_all(self):
         """Stop all processing (both STT and LLM)"""
         self.running = False
