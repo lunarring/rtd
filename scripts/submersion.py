@@ -216,7 +216,7 @@ if __name__ == "__main__":
         do_enable_dynamic_processor = False
         do_send_to_touchdesigner = False
         do_load_cam_input_from_file = False
-        do_save_diffusion_output_to_file = True
+        do_save_diffusion_output_to_file = False
         
         video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
         print(video_file_path_input)
@@ -262,7 +262,7 @@ if __name__ == "__main__":
             do_fullscreen=do_fullscreen,
             display_id=0
         )
-        cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=7, cam_id=0)
+        cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=2, cam_id=0)
         cam.do_mirror = False
 
         # Initialize movie reader if loading from file
@@ -372,10 +372,14 @@ if __name__ == "__main__":
             acid_lightness = meta_input.get(akai_midimix="B2", val_min=-15, val_max=15, val_default=0)
             saturation = meta_input.get(akai_midimix="A1", val_min=0.0, val_max=2.0, val_default=1.0)  # Add saturation control
             keypoint_mask_R = int(meta_input.get(akai_midimix="C5", val_min=5.0, val_max=60.0, val_default=30.0))
-            cam_exposure_buf_size = int(meta_input.get(akai_midimix="E0", val_min=1, val_max=20, val_default=1))
+            cam_exposure_buf_size = 1
             human_seg_resize_factor = meta_input.get(akai_midimix="E2", val_min=0.1, val_max=1.0, val_default=0.5)
 
             if restart_stt:
+                try:
+                    prompt_provider_stt.streamer.stop_all()
+                except Exception as e:
+                    print(f"Error stopping STT: {e}")
                 prompt_provider_stt = PromptProviderSpeechToText(
                     init_prompt="A beautiful water sea",
                     llm_system_prompt=vis_llm_prompt,
