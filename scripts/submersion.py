@@ -145,7 +145,7 @@ def center_crop_to_size(img, target_height, target_width):
     
     # If image is too small, resize it first
     if h < target_height or w < target_width:
-        print(f"Warning: Image too small ({h}x{w}), resizing to match target size ({target_height}x{target_width})")
+        # print(f"Warning: Image too small ({h}x{w}), resizing to match target size ({target_height}x{target_width})")
         # Calculate scaling factor to make the smaller dimension match target
         scale_h = target_height / h
         scale_w = target_width / w
