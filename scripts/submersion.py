@@ -140,6 +140,30 @@ def get_sample_shape_unet(coord, noise_resolution_h, noise_resolution_w):
     return shape
 
 
+def center_crop_to_size(img, target_height, target_width):
+    h, w = img.shape[:2]
+    
+    # If image is too small, resize it first
+    if h < target_height or w < target_width:
+        print(f"Warning: Image too small ({h}x{w}), resizing to match target size ({target_height}x{target_width})")
+        # Calculate scaling factor to make the smaller dimension match target
+        scale_h = target_height / h
+        scale_w = target_width / w
+        scale = max(scale_h, scale_w)
+        
+        # Resize image
+        new_h = int(h * scale)
+        new_w = int(w * scale)
+        img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+        h, w = img.shape[:2]
+    
+    # Calculate starting points for center crop
+    start_h = (h - target_height) // 2
+    start_w = (w - target_width) // 2
+    
+    return img[start_h:start_h + target_height, start_w:start_w + target_width]
+
+
 if __name__ == "__main__":
 
     do_audiotorium_projector = True
@@ -171,7 +195,7 @@ if __name__ == "__main__":
     do_fullscreen = False
     do_enable_dynamic_processor = False
     do_send_to_touchdesigner = False
-    do_load_cam_input_from_file = False
+    do_load_cam_input_from_file = True
     do_save_diffusion_output_to_file = False
     
     video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
@@ -327,6 +351,7 @@ if __name__ == "__main__":
         saturation = meta_input.get(akai_midimix="A1", val_min=0.0, val_max=2.0, val_default=1.0)  # Add saturation control
         keypoint_mask_R = int(meta_input.get(akai_midimix="C5", val_min=5.0, val_max=60.0, val_default=30.0))
         cam_exposure_buf_size = int(meta_input.get(akai_midimix="E0", val_min=1, val_max=20, val_default=1))
+        human_seg_resize_factor = meta_input.get(akai_midimix="E2", val_min=0.1, val_max=1.0, val_default=0.2)
 
         if zoom_in_factor * zoom_out_factor == 0:
             zoom_factor = 1 - zoom_in_factor + zoom_out_factor
@@ -495,6 +520,10 @@ if __name__ == "__main__":
             if img_cam is not None and img_cam.size > 0:
                 img_cam = img_cam[:, :, ::-1].copy()
 
+            # Center crop to exact target dimensions
+            img_cam = center_crop_to_size(img_cam, height_diffusion, width_diffusion)
+
+        # print(f"img_cam.shape: {img_cam.shape} aspect_ratio: {img_cam.shape[1]/img_cam.shape[0]}")
         img_cam_last = img_cam.copy()
 
         fps_tracker.start_segment("OptFlow")
@@ -513,7 +542,7 @@ if __name__ == "__main__":
         input_image_processor.set_human_seg(do_human_seg)
         input_image_processor.set_motion_tracking_masking(do_motion_tracking_masking)
         input_image_processor.set_opt_flow_seg(do_opt_flow_seg)
-        input_image_processor.set_resizing_factor_humanseg(0.4)
+        input_image_processor.set_resizing_factor_humanseg(human_seg_resize_factor)
         input_image_processor.set_blur(do_blur)
         input_image_processor.set_brightness(brightness)
         input_image_processor.set_hue_rotation(hue_rotation_angle)
@@ -544,6 +573,7 @@ if __name__ == "__main__":
         img_acid = acid_processor.process(img_proc, human_seg_mask)
 
         # Start timing diffusion
+        # print(f"img_acid.shape: {img_acid.shape}")
         de_img.set_input_image(img_acid)
         de_img.set_guidance_scale(0.5)
         de_img.set_num_inference_steps(int(nmb_inference_steps))

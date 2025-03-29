@@ -69,6 +69,7 @@ class HumanSeg:
             input_img = np.array(input_img)
         
         orig_size = (input_img.shape[1], input_img.shape[0])
+        print(f"orig_size: {orig_size}")
         input_tensor = self.preprocess(input_img.copy())
         
         if self.resizing_factor is not None or self.size is not None:
