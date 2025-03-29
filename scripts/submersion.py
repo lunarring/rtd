@@ -145,7 +145,7 @@ def center_crop_to_size(img, target_height, target_width):
     
     # If image is too small, resize it first
     if h < target_height or w < target_width:
-        print(f"Warning: Image too small ({h}x{w}), resizing to match target size ({target_height}x{target_width})")
+        # print(f"Warning: Image too small ({h}x{w}), resizing to match target size ({target_height}x{target_width})")
         # Calculate scaling factor to make the smaller dimension match target
         scale_h = target_height / h
         scale_w = target_width / w
@@ -200,8 +200,8 @@ if __name__ == "__main__":
         height_diffusion = int((384 + 96) * res_factor)  # 12 * (384 + 96) // 8
         width_diffusion = int((512 + 128) * res_factor)  # 12 * (512 + 128) // 8
 
-    shape_hw_cam = (1080//2, 1920//2)
-    #shape_hw_cam = (1080, 1920)
+    # shape_hw_cam = (1080//2, 1920//2)
+    shape_hw_cam = (576, 1024)
 
     touchdesigner_host = "192.168.100.101"  # Change to your TouchDesigner machine's IP
     touchdesigner_port = 9998
@@ -213,11 +213,10 @@ if __name__ == "__main__":
     do_enable_dynamic_processor = False
     do_send_to_touchdesigner = False
     do_load_cam_input_from_file = False
-    do_save_diffusion_output_to_file = False
+    do_save_diffusion_output_to_file = True
     
     video_file_path_input = get_repo_path("materials/videos/long_cut4.mp4")
     print(video_file_path_input)
-    video_file_path_output = "materials/videos/long_cut_diffusion2.mp4"
 
     device = "cuda:0"
     img_diffusion = None
@@ -269,6 +268,8 @@ if __name__ == "__main__":
 
     # Initialize movie saver if saving output to file
     if do_save_diffusion_output_to_file:
+        movie_save_index = 0
+        video_file_path_output = f"materials/videos/long_raw{movie_save_index}.mp4"
         movie_saver = lt.MovieSaver(video_file_path_output, fps=12)
 
     input_image_processor = InputImageProcessor(device=device)
@@ -329,7 +330,7 @@ if __name__ == "__main__":
         new_prompt_mic_unmuter = meta_input.get(akai_lpd8="F1", akai_midimix="F3", button_mode="held_down")
 
         hue_rotation_angle = int(meta_input.get(akai_midimix="A0", val_min=0, val_max=360, val_default=0))
-        prompt_transition_time = meta_input.get(akai_lpd8="G1", akai_midimix="F0", val_min=1, val_max=20, val_default=8.0)
+        prompt_transition_time = meta_input.get(akai_lpd8="G1", akai_midimix="F0", val_min=1, val_max=20, val_default=1.0)
         do_cycle_prompt_from_file = meta_input.get(akai_lpd8="C0", akai_midimix="F4", button_mode="pressed_once")
 
         dyn_prompt_mic_unmuter = False  # meta_input.get(akai_lpd8="A0", akai_midimix="B3", button_mode="held_down")
@@ -353,7 +354,7 @@ if __name__ == "__main__":
         do_opt_flow = do_postproc or do_opt_flow_seg
         # floats
         # nmb_inference_steps = meta_input.get(akai_midimix="B0", val_min=2, val_max=10.0, val_default=2.0)
-        nmb_inference_steps = 3
+        nmb_inference_steps = 4
         acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.4)
         acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.0)
         # opt_flow_threshold = meta_input.get(akai_lpd8="E2", akai_midimix="E2", val_min=0, val_max=2, val_default=1)
@@ -521,6 +522,17 @@ if __name__ == "__main__":
 
         if frame_counter < 10 or not do_load_cam_input_from_file:
             img_cam = cam.get_img()
+
+            if do_save_diffusion_output_to_file:
+                movie_saver.write_frame(img_cam)
+                if frame_counter >= 512 * 8:
+                    movie_saver.finalize()
+                    print(f"Movie saved to {video_file_path_output} after {frame_counter+1} frames")
+                    # do_save_diffusion_output_to_file = False
+                    frame_counter = 0
+                    movie_save_index += 1
+                    video_file_path_output = f"materials/videos/long_raw{movie_save_index}.mp4"
+                    movie_saver = lt.MovieSaver(video_file_path_output, fps=12)
         else:
             # Get frame from video file instead of webcam
             img_cam = movie_reader.get_next_frame()
@@ -538,9 +550,9 @@ if __name__ == "__main__":
                 img_cam = img_cam[:, :, ::-1].copy()
 
             # Center crop to exact target dimensions
-        print(f"img_cam.shape before: {img_cam.shape}")
+        # print(f"img_cam.shape before: {img_cam.shape}")
         img_cam = center_crop_to_size(img_cam, height_diffusion, width_diffusion)
-        print(f"img_cam.shape: {img_cam.shape}")
+        # print(f"img_cam.shape: {img_cam.shape}")
         # print(f"img_cam.shape: {img_cam.shape} aspect_ratio: {img_cam.shape[1]/img_cam.shape[0]}")
         img_cam_last = img_cam.copy()
 
@@ -664,13 +676,6 @@ if __name__ == "__main__":
 
         if do_send_to_touchdesigner:
             td_sender.send_image(output_to_render)
-
-        if do_save_diffusion_output_to_file:
-            movie_saver.write_frame(output_to_render)
-            if frame_counter >= 512 * 8:
-                movie_saver.finalize()
-                print(f"Movie saved to {video_file_path_output} after {frame_counter+1} frames")
-                do_save_diffusion_output_to_file = False
 
         # Update and display FPS (this will also handle the last segment timing)
         fps_tracker.print_fps()
