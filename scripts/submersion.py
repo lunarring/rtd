@@ -54,7 +54,7 @@ import socket
 
 from rtd.utils.compression_helpers import send_compressed
 
-vis_llm_prompt = """Your task is to directly translate from poetry into visual descriptions. I give you couple examples and you can do it then for the next one. Here are rules: Your task is to produce a valid and new output. Keep the style and length of the examples in your output. Don't make it longer. Stay within the theme of the examples!
+vis_llm_prompt = """Your task is to directly translate from poetry into visual descriptions. I give you couple examples and you can do it then for the next one. Here are rules: Your task is to produce a valid and new output. Keep the style and length of the examples in your output. Don't make it longer. Stay within the theme of the examples! And please AVOID anything that sounds too much like a description of a human body or something dancing. Or any mention of body, dont have it as output.
 
 Input: The surface is not motionless. Output: Waves on the surface of endless blue ocean and flickering, silver light 
 Input: movement originates from the tides Output: regular movement of waves depends on the (invisible) underwater tides 
@@ -358,7 +358,7 @@ if __name__ == "__main__":
             do_opt_flow = do_postproc or do_opt_flow_seg
             # floats
             # nmb_inference_steps = meta_input.get(akai_midimix="B0", val_min=2, val_max=10.0, val_default=2.0)
-            nmb_inference_steps = 4
+            nmb_inference_steps = 3
             acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.4)
             acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.0)
             # opt_flow_threshold = meta_input.get(akai_lpd8="E2", akai_midimix="E2", val_min=0, val_max=2, val_default=1)
