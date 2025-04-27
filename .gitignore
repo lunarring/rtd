@@ -1,8 +1,10 @@
 # Byte-compiled / optimized / DLL files
-# Ignore all JPG images in materials/images folder
-materials/images/*.jpg
-materials/images/*.jpeg
-
+models/*
+cache/*
+DEADJOE
+*.toml~
+*.txt
+*.mp4
 src/rtd/dynamic_processor/dynamic_module.py
 */logs/*
 backup_dynamic*
@@ -11,6 +13,8 @@ logs/*
 *.py~
 *.swp
 prompts/*
+# Ignore all images in materials/images directory
+materials/images/
 dynamic_module.json
 dynamic_module.py
 *.pyc

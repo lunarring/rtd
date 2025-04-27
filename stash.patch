@@ -1,0 +1,137 @@
+diff --git a/scripts/submersion.py b/scripts/submersion.py
+index 5440d7d..5175973 100644
+--- a/scripts/submersion.py
++++ b/scripts/submersion.py
+@@ -1,11 +1,7 @@
+ # TODO:
+ # possibly short term
+-
+-# - @alex, why this line? human_seg_mask = final_mask * 255
+-# - AR knob
+ # - @alex review and improve optical flow mask
+ # - optical flow acid
+-# - reconfigure akai midimix (use sliders)
+ # - investigate better noise
+ #   - noise measurement (experiments)
+ #   - noise reduction:
+@@ -14,8 +10,6 @@
+ #     - other filters (using optflow?)?
+ #     - denoising
+ # - automatic prompt injection
+-# - understand mem acid better
+-# - smooth continuation mode
+ # - objects floating around or being interactive
+ # - display prompts option
+ 
+@@ -83,48 +77,6 @@ Input: The Pattern of Movement, a ripple Output: trembling  pattern of movement
+ The next message I send you will be an Input, and you directly continue after 'Output: ', without any other text, just directly start without mentinoing output."""
+ 
+ 
+-class TouchDesignerSender:
+-    def __init__(self, host="localhost", port=9998):
+-        self.host = host
+-        self.port = port
+-        self.socket = None
+-        self.connected = False
+-        self.attempt_reconnect = True
+-        self.last_reconnect_time = 0
+-        self.reconnect_interval = 5  # seconds between reconnection attempts
+-
+-    def connect(self):
+-        try:
+-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+-            self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+-            self.socket.settimeout(0.5)  # Short timeout for connection attempts
+-            self.socket.connect((self.host, self.port))
+-            self.connected = True
+-            self.socket.settimeout(None)  # Reset timeout for normal operation
+-            print(f"Connected to TouchDesigner at {self.host}:{self.port}")
+-            return True
+-        except Exception as e:
+-            print(f"Failed to connect to TouchDesigner: {e}")
+-            self.connected = False
+-            return False
+-
+-    def send_image(self, image):
+-        if not self.connected:
+-            current_time = time.time()
+-            if self.attempt_reconnect and (current_time - self.last_reconnect_time > self.reconnect_interval):
+-                self.last_reconnect_time = current_time
+-                self.connect()
+-
+-            if not self.connected:
+-                return False
+-
+-        try:
+-            send_compressed(self.socket, image, quality=90)
+-            return True
+-        except Exception as e:
+-            print(f"Error sending to TouchDesigner: {e}")
+-            self.connected = False
+-            return False
+ 
+ 
+ def get_sample_shape_unet(coord, noise_resolution_h, noise_resolution_w):
+@@ -184,37 +136,27 @@ def center_crop_to_size(img, target_height, target_width):
+ if __name__ == "__main__":
+     try:
+ 
+-        do_audiotorium_projector = True
+         res_factor = 1.25
+         aspect_ratio = 4.2/3
+ 
+-        if do_audiotorium_projector:
+-            height_render = 1080
+-            width_render = int(height_render * aspect_ratio)
+-            width_render = 1920
+ 
+-            height_diffusion = int((480) * res_factor)  # 12 * (384 + 96) // 8
+-            width_diffusion = int((480 * aspect_ratio) * res_factor)  # 12 * (512 + 128) // 8        
+-        else:
+-            height_render = 1080
+-            width_render = 1920
++        height_render = 1080
++        width_render = 1920
+ 
+-            height_diffusion = int((384 + 96) * res_factor)  # 12 * (384 + 96) // 8
+-            width_diffusion = int((512 + 128) * res_factor)  # 12 * (512 + 128) // 8
++        height_diffusion = int((384 + 96) * res_factor)  # 12 * (384 + 96) // 8
++        width_diffusion = int((512 + 128) * res_factor)  # 12 * (512 + 128) // 8
+ 
+         shape_hw_cam = (1080//2, 1920//2)
+         # shape_hw_cam = (1080//1, 1920//1)
+         #shape_hw_cam = (576, 1024)
+ 
+-        touchdesigner_host = "192.168.100.101"  # Change to your TouchDesigner machine's IP
+-        touchdesigner_port = 9998
++
+ 
+         do_realtime_transcription = True
+         do_compile = True
+         do_diffusion = True
+         do_fullscreen = True
+         do_enable_dynamic_processor = False
+-        do_send_to_touchdesigner = False
+         do_load_cam_input_from_file = False
+         do_save_diffusion_output_to_file = False
+         
+@@ -278,9 +220,7 @@ if __name__ == "__main__":
+         input_image_processor = InputImageProcessor(device=device)
+         input_image_processor.set_flip(do_flip=False, flip_axis=1)
+ 
+-        if do_send_to_touchdesigner:
+-            td_sender = TouchDesignerSender(host=touchdesigner_host, port=touchdesigner_port)
+-            td_sender.connect()
++
+ 
+         # Initialize modulations dictionary and noise
+         modulations = {}
+@@ -690,8 +630,6 @@ if __name__ == "__main__":
+             # for frame in interpolated_frames:
+             renderer.render(img_proc if do_debug_seethrough else output_to_render)
+ 
+-            if do_send_to_touchdesigner:
+-                td_sender.send_image(output_to_render)
+ 
+             # Update and display FPS (this will also handle the last segment timing)
+             fps_tracker.print_fps()

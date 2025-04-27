@@ -11,7 +11,7 @@ def dynamic_print(text):
 
 def main():
     # Initialize webcam
-    cam = WebCam(cam_id=0)
+    cam = WebCam(cam_id=0, fixed_fps=15)
 
     try:
         while True:

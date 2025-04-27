@@ -10,6 +10,9 @@ from PIL import Image
 from .infrared.colorize_infrared import ImageColorizationPipelineHF
 
 
+from motion.motion_tracking import MotionTracker
+
+
 def img2tensor(tensor):
     """
     Converts a tensor to a numpy array.
@@ -138,17 +141,10 @@ def torch_rotate(x, a):
 
 
 class InputImageProcessor:
-    def __init__(
-        self,
-        do_human_seg=True,
-        do_blur=False,
-        blur_kernel=3,
-        do_infrared_colorize=False,
-        device="cuda",
-    ):
+    def __init__(self, do_human_seg=True, do_blur=False, blur_kernel=3, do_infrared_colorize=False, device="cuda"):
         self.device = device
         self.brightness = 1.0
-        self.saturization = 1.0
+        self.saturation = 1.0
         self.hue_rotation_angle = 0
         self.blur = None
         self.blur_kernel = blur_kernel
@@ -157,10 +153,19 @@ class InputImageProcessor:
         #  image colorization model for infrared images
         self.infrared_colorizer = ImageColorizationPipelineHF()
 
+        # initialize motion tracking
+
+        try:
+            from motion.motion_tracking import MotionTracker
+            self.motion_tracker = MotionTracker(max_people=3)
+        except Exception as e:
+            print(f"MotionTracker not found! {e}. Motion tracking masking will not be applied.")
+
         # human body segmentation
         self.human_seg = HumanSeg(
             resizing_factor=self.resizing_factor_humanseg, device=device, apply_smoothing=True, gaussian_kernel_size=9, gaussian_sigma=3
         )
+
         self.set_blur_size(self.blur_kernel)
 
         self.do_human_seg = do_human_seg
@@ -171,6 +176,8 @@ class InputImageProcessor:
         self.opt_flow_blur_kernel = (21, 21)
         self.opt_flow_blur_sigma = 5
         self.flip_axis = None
+        self.do_motion_tracking_masking = False
+        self.keypoint_mask_R = 30
 
         self.list_history_frames = []
 
@@ -181,8 +188,8 @@ class InputImageProcessor:
     def set_brightness(self, brightness=1):
         self.brightness = brightness
 
-    def set_saturization(self, saturization):
-        self.saturization = saturization
+    def set_saturation(self, saturation):
+        self.saturation = saturation
 
     def set_hue_rotation(self, hue_rotation_angle=0):
         self.hue_rotation_angle = hue_rotation_angle
@@ -211,6 +218,12 @@ class InputImageProcessor:
 
     def set_opt_flow_threshold(self, threshold=1):
         self.opt_flow_threshold = threshold
+
+    def set_motion_tracking_masking(self, do_motion_tracking_masking=True):
+        self.do_motion_tracking_masking = do_motion_tracking_masking
+        
+    def set_keypoint_mask_R(self, keypoint_mask_R):
+        self.keypoint_mask_R = keypoint_mask_R
 
     def create_opt_flow_mask(self, opt_flow):
         """Create a mask from optical flow data."""
@@ -254,7 +267,10 @@ class InputImageProcessor:
 
         # Get human segmentation mask if enabled
         if self.do_human_seg:
-            human_seg_mask = self.human_seg.get_mask(img)
+            if self.do_motion_tracking_masking:
+                human_seg_mask = self.motion_tracker.return_mask(img, keypoint_mask_R=self.keypoint_mask_R)
+            else:
+                human_seg_mask = self.human_seg.get_mask(img)
 
         # Get optical flow mask if enabled
         if self.do_opt_flow_seg and opt_flow is not None:
@@ -300,24 +316,26 @@ class InputImageProcessor:
         #     self.list_history_frames = self.list_history_frames[1:]
         #     img = np.mean(np.stack(self.list_history_frames), axis=0)
 
-        img *= self.brightness
-        img = np.clip(img, 0, 255)
-        img = img.astype(np.uint8)
-
-        if self.saturization != 1.0 or self.hue_rotation_angle != 0:
-            # convert the image to HSV
-            img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype(float)
-            # adjust saturization
-            img_hsv[:, :, 1] *= self.saturization
-
-            # Rotate the hue
-            # Hue is represented in OpenCV as a value from 0 to 180 instead of 0 to 360...
-            img_hsv[:, :, 0] = (img_hsv[:, :, 0] + (self.hue_rotation_angle / 2)) % 180
-
-            # clip the values to stay in valid range
-            img_hsv[:, :, 1] = np.clip(img_hsv[:, :, 1], 0, 255)
-            # convert the image back to BGR
-            img = cv2.cvtColor(img_hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+        # HSV color space adjustment
+        if self.saturation != 1.0 or self.hue_rotation_angle != 0.0 or self.brightness != 1.0:
+            # Convert to HSV
+            img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+            
+            # Apply hue rotation
+            if self.hue_rotation_angle != 0.0:
+                img_hsv[:, :, 0] = (img_hsv[:, :, 0] + self.hue_rotation_angle) % 360
+            
+            # Apply saturation
+            if self.saturation != 1.0:
+                img_hsv[:, :, 1] = np.clip(img_hsv[:, :, 1] * self.saturation, 0, 1)
+            # Apply brightness (V channel)
+            if self.brightness != 1.0:
+                img_hsv[:, :, 2] = np.clip(img_hsv[:, :, 2] * self.brightness, 0, 255)
+            
+            # Convert back to BGR
+            img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR).astype(np.uint8)
+        else:
+            img = img.astype(np.uint8)
 
         return img, human_seg_mask
 
@@ -339,6 +357,9 @@ class AcidProcessor:
         self.y_shift = 0
         self.zoom_factor = 1
         self.rotation_angle = 0
+        self.acid_hue_rotation_angle = 0
+        self.acid_saturation_adjustment = 0
+        self.acid_lightness_adjustment = 0
         self.do_acid_tracers = False
 
         self.do_acid_wobblers = False
@@ -371,6 +392,15 @@ class AcidProcessor:
 
     def set_rotation_angle(self, rotation_angle):
         self.rotation_angle = rotation_angle
+
+    def set_acid_hue_rotation_angle(self, hue_rotation_angle):
+        self.acid_hue_rotation_angle = hue_rotation_angle
+
+    def set_acid_saturation_adjustment(self, saturation_adjustment):
+        self.acid_saturation_adjustment = saturation_adjustment
+
+    def set_acid_lightness_adjustment(self, lightness_adjustment):
+        self.acid_lightness_adjustment = lightness_adjustment
 
     def set_acid_tracers(self, do_acid_tracers):
         self.do_acid_tracers = do_acid_tracers
@@ -480,6 +510,23 @@ class AcidProcessor:
         width_diffusion = self.width_diffusion
         height_diffusion = self.height_diffusion
 
+        # Apply hue rotation to the last diffusion image if needed
+        if abs(self.acid_hue_rotation_angle) > 0 or abs(self.acid_saturation_adjustment) > 0 or abs(self.acid_lightness_adjustment) > 0:
+            # Convert to numpy to use OpenCV for hue rotation
+            last_diffusion_image_np = last_diffusion_image_torch.cpu().numpy().astype(np.uint8)
+            # Convert to HSV
+            last_diffusion_image_hsv = cv2.cvtColor(last_diffusion_image_np, cv2.COLOR_BGR2HSV).astype(float)
+            # Apply hue rotation (OpenCV uses 0-180 range for hue)
+            last_diffusion_image_hsv[:, :, 0] = (last_diffusion_image_hsv[:, :, 0] + self.acid_hue_rotation_angle) % 360
+            # Apply saturation adjustment (ensuring we don't overflow)
+            last_diffusion_image_hsv[:, :, 1] = np.clip(last_diffusion_image_hsv[:, :, 1] + self.acid_saturation_adjustment, 0, 255)
+            # Apply lightness adjustment (ensuring we don't overflow)
+            last_diffusion_image_hsv[:, :, 2] = np.clip(last_diffusion_image_hsv[:, :, 2] + self.acid_lightness_adjustment, 0, 255)
+            # Convert back to BGR
+            last_diffusion_image_np = cv2.cvtColor(last_diffusion_image_hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+            # Back to torch tensor
+            last_diffusion_image_torch = torch.from_numpy(last_diffusion_image_np).to(self.device).float()
+
         # acid transform
         # wobblers
         if self.do_acid_wobblers:
@@ -535,6 +582,7 @@ class AcidProcessor:
 
         img_input_torch = torch.from_numpy(image_input.copy()).to(self.device).float()
         if img_input_torch.shape[0] != height_diffusion or img_input_torch.shape[1] != width_diffusion:
+            print(f"Resizing image from {img_input_torch.shape[0]}x{img_input_torch.shape[1]} to {height_diffusion}x{width_diffusion}, this is not a good idea.")
             img_input_torch = lt.resize(
                 img_input_torch.permute((2, 0, 1)),
                 size=(height_diffusion, width_diffusion),
@@ -554,7 +602,7 @@ class AcidProcessor:
                 1.0 - self.acid_strength_foreground
             ) * img_input_torch + self.acid_strength_foreground * last_diffusion_image_torch
         else:
-            img_input_torch = (1.0 - self.acid_strength) * img_input_torch + self.acid_strength * last_diffusion_image_torch
+            img_input_torch = (1.0 - self.acid_strength_foreground) * img_input_torch + self.acid_strength_foreground * last_diffusion_image_torch
 
         # additive noise
         if self.coef_noise > 0:
@@ -562,7 +610,7 @@ class AcidProcessor:
             t_rand = (torch.rand(img_input_torch.shape, device=img_input_torch.device)[:, :, 0].unsqueeze(2) - 0.5) * self.coef_noise * 255
             img_input_torch += t_rand
         # Apply color matching if enabled
-        if np.abs(self.color_matching-0.5) > 0.01:
+        if self.color_matching > 0.01:
             if human_seg_mask is not None:
                 if human_seg_mask.ndim == 2:
                     human_seg_mask = np.expand_dims(human_seg_mask, axis=2)
