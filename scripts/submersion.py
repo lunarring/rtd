@@ -136,11 +136,11 @@ def center_crop_to_size(img, target_height, target_width):
 if __name__ == "__main__":
     try:
 
-        res_factor = 1.25
+        res_factor = 1.75
         aspect_ratio = 4.2/3
 
 
-        height_render = 1080
+        height_render = 1200
         width_render = 1920
 
         height_diffusion = int((384 + 96) * res_factor)  # 12 * (384 + 96) // 8
@@ -150,9 +150,7 @@ if __name__ == "__main__":
         # shape_hw_cam = (1080//1, 1920//1)
         #shape_hw_cam = (576, 1024)
 
-
-
-        do_realtime_transcription = True
+        do_realtime_transcription = False
         do_compile = True
         do_diffusion = True
         do_fullscreen = True
@@ -181,6 +179,7 @@ if __name__ == "__main__":
         # init_prompt = "glowing digital fire full of glitches and neon matrix powerful fire glow and plasma"
         # init_prompt = "glowing digital fire full of glitches and neon matrix powerful fire glow and plasma"
         init_prompt = "The Metamorphosis of Time: Deep below, volcano's asleep, pulsating rhythmically on the still mirror of the lake"
+        init_prompt = "Beautiful energy colored human baloon full of colors"
 
         meta_input = lt.MetaInput()
         de_img = DiffusionEngine(
@@ -204,7 +203,7 @@ if __name__ == "__main__":
             do_fullscreen=do_fullscreen,
             display_id=0
         )
-        cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=2, cam_id=0)
+        cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=False, exposure_buf_size=2, cam_id=0)
         cam.do_mirror = False
 
         # Initialize movie reader if loading from file
@@ -218,7 +217,7 @@ if __name__ == "__main__":
             movie_saver = lt.MovieSaver(video_file_path_output, fps=12)
 
         input_image_processor = InputImageProcessor(device=device)
-        input_image_processor.set_flip(do_flip=False, flip_axis=1)
+        input_image_processor.set_flip(do_flip=True, flip_axis=1)
 
 
 
@@ -294,13 +293,13 @@ if __name__ == "__main__":
             # do_optical_flow = meta_input.get(akai_midimix="C4", button_mode="toggle", val_default=True)
             do_postproc = meta_input.get(akai_midimix="D3", button_mode="toggle", val_default=False)
             do_blur = meta_input.get(akai_lpd8="B3", button_mode="toggle", val_default=False)
-            use_microphone_input = meta_input.get(akai_midimix="G3", button_mode="toggle", val_default=True)
+            use_microphone_input = True
             do_opt_flow = do_postproc or do_opt_flow_seg
             # floats
             # nmb_inference_steps = meta_input.get(akai_midimix="B0", val_min=2, val_max=10.0, val_default=2.0)
             nmb_inference_steps = 3
-            acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.4)
-            acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.0)
+            acid_strength = meta_input.get(akai_lpd8="E0", akai_midimix="C0", val_min=0, val_max=1.0, val_default=0.25)
+            acid_strength_foreground = meta_input.get(akai_lpd8="E1", akai_midimix="C1", val_min=0, val_max=1.0, val_default=0.25)
             # opt_flow_threshold = meta_input.get(akai_lpd8="E2", akai_midimix="E2", val_min=0, val_max=2, val_default=1)
             opt_flow_threshold = 1
             coef_noise = meta_input.get(akai_lpd8="F0", akai_midimix="C2", val_min=0, val_max=0.3, val_default=0.08)

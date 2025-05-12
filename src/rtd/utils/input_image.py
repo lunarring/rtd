@@ -10,7 +10,7 @@ from PIL import Image
 from .infrared.colorize_infrared import ImageColorizationPipelineHF
 
 
-from motion.motion_tracking import MotionTracker
+# from motion.motion_tracking import MotionTracker
 
 
 def img2tensor(tensor):
@@ -155,11 +155,11 @@ class InputImageProcessor:
 
         # initialize motion tracking
 
-        try:
-            from motion.motion_tracking import MotionTracker
-            self.motion_tracker = MotionTracker(max_people=3)
-        except Exception as e:
-            print(f"MotionTracker not found! {e}. Motion tracking masking will not be applied.")
+        # try:
+        #    from motion.motion_tracking import MotionTracker
+        #    self.motion_tracker = MotionTracker(max_people=3)
+        # except Exception as e:
+        #    print(f"MotionTracker not found! {e}. Motion tracking masking will not be applied.")
 
         # human body segmentation
         self.human_seg = HumanSeg(
@@ -221,7 +221,7 @@ class InputImageProcessor:
 
     def set_motion_tracking_masking(self, do_motion_tracking_masking=True):
         self.do_motion_tracking_masking = do_motion_tracking_masking
-        
+
     def set_keypoint_mask_R(self, keypoint_mask_R):
         self.keypoint_mask_R = keypoint_mask_R
 
@@ -267,10 +267,12 @@ class InputImageProcessor:
 
         # Get human segmentation mask if enabled
         if self.do_human_seg:
-            if self.do_motion_tracking_masking:
-                human_seg_mask = self.motion_tracker.return_mask(img, keypoint_mask_R=self.keypoint_mask_R)
-            else:
-                human_seg_mask = self.human_seg.get_mask(img)
+            # if self.do_motion_tracking_masking:
+            #     human_seg_mask = self.motion_tracker.return_mask(img, keypoint_mask_R=self.keypoint_mask_R)
+            # else:
+            #     human_seg_mask = self.human_seg.get_mask(img)
+
+            human_seg_mask = self.human_seg.get_mask(img)
 
         # Get optical flow mask if enabled
         if self.do_opt_flow_seg and opt_flow is not None:
@@ -320,18 +322,18 @@ class InputImageProcessor:
         if self.saturation != 1.0 or self.hue_rotation_angle != 0.0 or self.brightness != 1.0:
             # Convert to HSV
             img_hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-            
+
             # Apply hue rotation
             if self.hue_rotation_angle != 0.0:
                 img_hsv[:, :, 0] = (img_hsv[:, :, 0] + self.hue_rotation_angle) % 360
-            
+
             # Apply saturation
             if self.saturation != 1.0:
                 img_hsv[:, :, 1] = np.clip(img_hsv[:, :, 1] * self.saturation, 0, 1)
             # Apply brightness (V channel)
             if self.brightness != 1.0:
                 img_hsv[:, :, 2] = np.clip(img_hsv[:, :, 2] * self.brightness, 0, 255)
-            
+
             # Convert back to BGR
             img = cv2.cvtColor(img_hsv, cv2.COLOR_HSV2BGR).astype(np.uint8)
         else:
@@ -582,7 +584,9 @@ class AcidProcessor:
 
         img_input_torch = torch.from_numpy(image_input.copy()).to(self.device).float()
         if img_input_torch.shape[0] != height_diffusion or img_input_torch.shape[1] != width_diffusion:
-            print(f"Resizing image from {img_input_torch.shape[0]}x{img_input_torch.shape[1]} to {height_diffusion}x{width_diffusion}, this is not a good idea.")
+            print(
+                f"Resizing image from {img_input_torch.shape[0]}x{img_input_torch.shape[1]} to {height_diffusion}x{width_diffusion}, this is not a good idea."
+            )
             img_input_torch = lt.resize(
                 img_input_torch.permute((2, 0, 1)),
                 size=(height_diffusion, width_diffusion),
@@ -602,7 +606,9 @@ class AcidProcessor:
                 1.0 - self.acid_strength_foreground
             ) * img_input_torch + self.acid_strength_foreground * last_diffusion_image_torch
         else:
-            img_input_torch = (1.0 - self.acid_strength_foreground) * img_input_torch + self.acid_strength_foreground * last_diffusion_image_torch
+            img_input_torch = (
+                1.0 - self.acid_strength_foreground
+            ) * img_input_torch + self.acid_strength_foreground * last_diffusion_image_torch
 
         # additive noise
         if self.coef_noise > 0:
