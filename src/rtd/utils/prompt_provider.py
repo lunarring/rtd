@@ -12,7 +12,7 @@ import argparse
 from signal import signal, SIGINT
 
 # Import from RTD modules
-from rtd.voice.speech_to_text_streaming import SpeechToTextStreamer
+# from rtd.voice.speech_to_text_streaming import SpeechToTextStreamer
 
 
 # Configure logging

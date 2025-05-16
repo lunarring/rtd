@@ -34,7 +34,7 @@ from rtd.utils.oscillators import Oscillator
 from rtd.utils.prompt_provider import (
     PromptProviderMicrophone,
     PromptProviderTxtFile,
-    PromptProviderSpeechToText,
+    # PromptProviderSpeechToText,
 )
 from rtd.utils.misc_utils import get_repo_path
 import time
@@ -152,7 +152,7 @@ if __name__ == "__main__":
 
 
 
-        do_realtime_transcription = True
+        do_realtime_transcription = False
         do_compile = True
         do_diffusion = True
         do_fullscreen = True
@@ -204,7 +204,7 @@ if __name__ == "__main__":
             do_fullscreen=do_fullscreen,
             display_id=0
         )
-        cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=2, cam_id=0)
+        cam = lt.WebCam(shape_hw=shape_hw_cam, do_digital_exposure_accumulation=True, exposure_buf_size=2, cam_id=1)
         cam.do_mirror = False
 
         # Initialize movie reader if loading from file

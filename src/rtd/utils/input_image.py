@@ -10,7 +10,7 @@ from PIL import Image
 from .infrared.colorize_infrared import ImageColorizationPipelineHF
 
 
-from motion.motion_tracking import MotionTracker
+# from motion.motion_tracking import MotionTracker
 
 
 def img2tensor(tensor):
